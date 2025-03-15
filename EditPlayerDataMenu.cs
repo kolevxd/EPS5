@@ -57,49 +57,37 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 new NumberPlayerDataSetting("Games Won", VanillaSprites.ConfettiIcon, 0,
                     () => GetPlayer().Data.completedGame, t => GetPlayer().Data.completedGame = t),
                 
-                // New stats added as requested
+                // New stats added as requested - using actual field names from Btd6
                 new NumberPlayerDataSetting("Games Played", VanillaSprites.ConfettiIcon, 0,
-                    () => GetPlayer().Data.gamesStarted, t => GetPlayer().Data.gamesStarted = t),
-                new NumberPlayerDataSetting("Highest Round (All Time)", VanillaSprites.BadBloonIcon, 0,
+                    () => GetPlayer().Data.gamesPlayed, t => GetPlayer().Data.gamesPlayed = t),
+                new NumberPlayerDataSetting("Highest Round", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.highestSeenRound, t => GetPlayer().Data.highestSeenRound = t),
-                new NumberPlayerDataSetting("Highest Round (Current Version)", VanillaSprites.BadBloonIcon, 0,
-                    () => GetPlayer().Data.highestSeenRoundThisVersion, t => GetPlayer().Data.highestSeenRoundThisVersion = t),
-                new NumberPlayerDataSetting("Highest Round (CHIMPS)", VanillaSprites.BadBloonIcon, 0,
-                    () => GetPlayer().Data.highestSeenRoundChimps, t => GetPlayer().Data.highestSeenRoundChimps = t),
-                new NumberPlayerDataSetting("Highest Round (Deflation)", VanillaSprites.BadBloonIcon, 0,
-                    () => GetPlayer().Data.highestSeenRoundDeflation, t => GetPlayer().Data.highestSeenRoundDeflation = t),
-                new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.DartMonkeyIcon, 0,
-                    () => GetPlayer().Data.towersPlaced, t => GetPlayer().Data.towersPlaced = t),
                 new NumberPlayerDataSetting("Total Pop Count", VanillaSprites.BloonsTd6LogoIcon, 0,
                     () => GetPlayer().Data.totalPops, t => GetPlayer().Data.totalPops = t),
                 new NumberPlayerDataSetting("Total Co-op Pop Count", VanillaSprites.CoOpIcon, 0,
-                    () => GetPlayer().Data.totalCoopPops, t => GetPlayer().Data.totalCoopPops = t),
+                    () => GetPlayer().Data.coopPops, t => GetPlayer().Data.coopPops = t),
+                new NumberPlayerDataSetting("Cash Generated", VanillaSprites.MonkeyMoneyShop, 0,
+                    () => GetPlayer().Data.cashEarned, t => GetPlayer().Data.cashEarned = t),
+                new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
+                    () => GetPlayer().Data.bloonsPopped, t => GetPlayer().Data.bloonsPopped = t),
                 new NumberPlayerDataSetting("Camo Bloons Popped", VanillaSprites.CamoIcon, 0,
                     () => GetPlayer().Data.camoBloonsPopped, t => GetPlayer().Data.camoBloonsPopped = t),
-                new NumberPlayerDataSetting("Purple Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
-                    () => GetPlayer().Data.purpleBloonsPopped, t => GetPlayer().Data.purpleBloonsPopped = t),
                 new NumberPlayerDataSetting("Regrow Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
                     () => GetPlayer().Data.regrowBloonsPopped, t => GetPlayer().Data.regrowBloonsPopped = t),
-                new NumberPlayerDataSetting("Ceramic Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
-                    () => GetPlayer().Data.ceramicBloonsPopped, t => GetPlayer().Data.ceramicBloonsPopped = t),
                 new NumberPlayerDataSetting("MOABs Popped", VanillaSprites.MoabBloonIcon, 0,
                     () => GetPlayer().Data.moabsPopped, t => GetPlayer().Data.moabsPopped = t),
-                new NumberPlayerDataSetting("BFBs Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
+                new NumberPlayerDataSetting("BFBs Popped", VanillaSprites.BfbBloonIcon, 0,
                     () => GetPlayer().Data.bfbsPopped, t => GetPlayer().Data.bfbsPopped = t),
-                new NumberPlayerDataSetting("ZOMGs Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
+                new NumberPlayerDataSetting("ZOMGs Popped", VanillaSprites.ZomgBloonIcon, 0,
                     () => GetPlayer().Data.zomgsPopped, t => GetPlayer().Data.zomgsPopped = t),
-                new NumberPlayerDataSetting("DDTs Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
+                new NumberPlayerDataSetting("DDTs Popped", VanillaSprites.DdtBloonIcon, 0,
                     () => GetPlayer().Data.ddtsPopped, t => GetPlayer().Data.ddtsPopped = t),
                 new NumberPlayerDataSetting("BADs Popped", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.badsPopped, t => GetPlayer().Data.badsPopped = t),
                 new NumberPlayerDataSetting("Bloons Leaked", VanillaSprites.BloonsTd6LogoIcon, 0,
                     () => GetPlayer().Data.bloonsLeaked, t => GetPlayer().Data.bloonsLeaked = t),
-                new NumberPlayerDataSetting("Cash Generated", VanillaSprites.MonkeyMoneyShop, 0,
-                    () => GetPlayer().Data.cashEarned, t => GetPlayer().Data.cashEarned = t),
                 
                 // Original items continue below
-                new NumberPlayerDataSetting("Highest Seen Round", VanillaSprites.BadBloonIcon, 0,
-                    () => GetPlayer().Data.highestSeenRound, t => GetPlayer().Data.highestSeenRound = t),
                 new NumberPlayerDataSetting("Continues", VanillaSprites.ContinueIcon, 0,
                     () => GetPlayer().Data.continuesUsed.ValueInt, t => GetPlayer().Data.continuesUsed.Value = t),
                 new BoolPlayerDataSetting("Unlocked Big Bloons", VanillaSprites.BigBloonModeIcon, false,
@@ -426,7 +414,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel _topArea;
+    private ModHelperPanel? _topArea;
 
     private static Btd6Player GetPlayer()
     {
@@ -699,32 +687,34 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             foreach (var tower in Game.instance.GetTowerDetailModels())
             {
-                for (var path1 = 0; path1 <= 5; path1++)
+                var tierSet = new HashSet<int[]>(new TowerTiersEqualityComparer());
+                
+                for (var mainPath = 0; mainPath < 3; mainPath++)
                 {
-                    for (var path2 = 0; path2 <= (path1 > 0 ? 2 : 5); path2++)
+                    for (var mainPathTier = 0; mainPathTier <= 5; mainPathTier++)
                     {
-                        for (var path3 = 0; path3 <= (path1 > 0 || path2 > 0 ? 2 : 5); path3++)
+                
+                        for (var crossPath = 0; crossPath < 3; crossPath++)
                         {
-                            if (path1 > 2 && path2 > 2) continue; // Invalid tower
-                            if (path1 > 2 && path3 > 2) continue; // Invalid tower
-                            if (path2 > 2 && path3 > 2) continue; // Invalid tower
-                            if (path1 + path2 + path3 > 7) continue; // Invalid tower
-                            
-                            try
+                            for (var crossPathTier = 0; crossPathTier <= 2; crossPathTier++)
                             {
-                                var tiers = new[] { path1, path2, path3 };
-                                var tower = Game.instance.model.GetTower(tower.towerId, path1, path2, path3);
-                                if (tower != null)
-                                {
-                                    GetPlayer().GetInstaTower(tower.towerId, tiers).Quantity = 100;
-                                }
-                            }
-                            catch
-                            {
-                                // Ignore invalid tower configurations
+                                var tiers = new[] { 0, 0, 0 };
+                                tiers[crossPath] = crossPathTier;
+                                tiers[mainPath] = mainPathTier;
+
+                                tierSet.Add(tiers);
                             }
                         }
                     }
+                }
+                
+                foreach (var tiers in tierSet)
+                {
+                    try 
+                    {
+                        GetPlayer().GetInstaTower(tower.towerId, tiers).Quantity = 100;
+                    }
+                    catch { /* Ignore invalid tower configurations */ }
                 }
             }
         }
@@ -760,8 +750,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
-        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        _topArea?.GetDescendent<ModHelperButton>("UnlockAll")?.SetActive(anyUnlockable);
+        var filler = _topArea?.GetDescendent<ModHelperPanel>("UnlockAll Filler");
+        if (filler != null) filler.SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
