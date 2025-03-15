@@ -57,25 +57,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 new NumberPlayerDataSetting("Games Won", VanillaSprites.ConfettiIcon, 0,
                     () => GetPlayer().Data.completedGame, t => GetPlayer().Data.completedGame = t),
                 
-                // New stats added as requested - using only existing properties
+                // Only include the most basic known-to-exist stats
                 new NumberPlayerDataSetting("Highest Round", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.highestSeenRound, t => GetPlayer().Data.highestSeenRound = t),
-                
-                // Bloon-specific pop counts
-                new NumberPlayerDataSetting("Camo Bloons Popped", VanillaSprites.CamoIcon, 0,
-                    () => GetPlayer().Data.camoBloonsPopped, t => GetPlayer().Data.camoBloonsPopped = t),
-                new NumberPlayerDataSetting("Regrow Bloons Popped", VanillaSprites.RegrowIcon, 0,
-                    () => GetPlayer().Data.regrowBloonsPopped, t => GetPlayer().Data.regrowBloonsPopped = t),
-                new NumberPlayerDataSetting("MOABs Popped", VanillaSprites.MoabBloonIcon, 0,
-                    () => GetPlayer().Data.moabsPopped, t => GetPlayer().Data.moabsPopped = t),
-                new NumberPlayerDataSetting("BFBs Popped", VanillaSprites.BfbBloonIcon, 0,
-                    () => GetPlayer().Data.bfbsPopped, t => GetPlayer().Data.bfbsPopped = t),
-                new NumberPlayerDataSetting("ZOMGs Popped", VanillaSprites.ZomgBloonIcon, 0,
-                    () => GetPlayer().Data.zomgsPopped, t => GetPlayer().Data.zomgsPopped = t),
-                new NumberPlayerDataSetting("DDTs Popped", VanillaSprites.DdtBloonIcon, 0,
-                    () => GetPlayer().Data.ddtsPopped, t => GetPlayer().Data.ddtsPopped = t),
-                new NumberPlayerDataSetting("BADs Popped", VanillaSprites.BadBloonIcon, 0,
-                    () => GetPlayer().Data.badsPopped, t => GetPlayer().Data.badsPopped = t),
                 new NumberPlayerDataSetting("Bloons Leaked", VanillaSprites.BloonSendIcon, 0,
                     () => GetPlayer().Data.bloonsLeaked, t => GetPlayer().Data.bloonsLeaked = t),
                 
