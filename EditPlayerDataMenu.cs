@@ -56,12 +56,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     t => GetPlayer().GainTrophies(t - GetPlayer().Data.trophies.ValueInt, "")),
                 new NumberPlayerDataSetting("Games Won", VanillaSprites.ConfettiIcon, 0,
                     () => GetPlayer().Data.completedGame, t => GetPlayer().Data.completedGame = t),
-                
-                // Only include the most basic known-to-exist stats
                 new NumberPlayerDataSetting("Highest Round", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.highestSeenRound, t => GetPlayer().Data.highestSeenRound = t),
-                new NumberPlayerDataSetting("Bloons Leaked", VanillaSprites.BloonSendIcon, 0,
-                    () => GetPlayer().Data.bloonsLeaked, t => GetPlayer().Data.bloonsLeaked = t),
                 
                 // Original items continue below
                 new NumberPlayerDataSetting("Continues", VanillaSprites.ContinueIcon, 0,
@@ -95,8 +91,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     VanillaSprites.ChallengeThumbsUpIcon, 0,
                     () => GetPlayer().Data.consecutiveDailyChallengesCompleted,
                     t => GetPlayer().Data.consecutiveDailyChallengesCompleted = t),
-                new NumberPlayerDataSetting("Challenges Played", VanillaSprites.ChallengesIcon, 0,
-                    () => GetPlayer().Data.challengesPlayed.ValueInt, t => GetPlayer().Data.challengesPlayed.Value = t),
                 new NumberPlayerDataSetting("Hosted Coop Games", VanillaSprites.CoOpIcon, 0,
                     () => GetPlayer().Data.hostedCoopGames, t => GetPlayer().Data.hostedCoopGames = t),
                 new NumberPlayerDataSetting("Collection Event Crates Opened",
