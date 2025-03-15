@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BTD_Mod_Helper;
@@ -57,22 +57,14 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 new NumberPlayerDataSetting("Games Won", VanillaSprites.ConfettiIcon, 0,
                     () => GetPlayer().Data.completedGame, t => GetPlayer().Data.completedGame = t),
                 
-                // New stats added as requested - using actual field names from Btd6
-                new NumberPlayerDataSetting("Games Played", VanillaSprites.ConfettiIcon, 0,
-                    () => GetPlayer().Data.gamesPlayed, t => GetPlayer().Data.gamesPlayed = t),
+                // New stats added as requested - using only existing properties
                 new NumberPlayerDataSetting("Highest Round", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.highestSeenRound, t => GetPlayer().Data.highestSeenRound = t),
-                new NumberPlayerDataSetting("Total Pop Count", VanillaSprites.BloonsTd6LogoIcon, 0,
-                    () => GetPlayer().Data.totalPops, t => GetPlayer().Data.totalPops = t),
-                new NumberPlayerDataSetting("Total Co-op Pop Count", VanillaSprites.CoOpIcon, 0,
-                    () => GetPlayer().Data.coopPops, t => GetPlayer().Data.coopPops = t),
-                new NumberPlayerDataSetting("Cash Generated", VanillaSprites.MonkeyMoneyShop, 0,
-                    () => GetPlayer().Data.cashEarned, t => GetPlayer().Data.cashEarned = t),
-                new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
-                    () => GetPlayer().Data.bloonsPopped, t => GetPlayer().Data.bloonsPopped = t),
+                
+                // Bloon-specific pop counts
                 new NumberPlayerDataSetting("Camo Bloons Popped", VanillaSprites.CamoIcon, 0,
                     () => GetPlayer().Data.camoBloonsPopped, t => GetPlayer().Data.camoBloonsPopped = t),
-                new NumberPlayerDataSetting("Regrow Bloons Popped", VanillaSprites.BloonsTd6LogoIcon, 0,
+                new NumberPlayerDataSetting("Regrow Bloons Popped", VanillaSprites.RegrowIcon, 0,
                     () => GetPlayer().Data.regrowBloonsPopped, t => GetPlayer().Data.regrowBloonsPopped = t),
                 new NumberPlayerDataSetting("MOABs Popped", VanillaSprites.MoabBloonIcon, 0,
                     () => GetPlayer().Data.moabsPopped, t => GetPlayer().Data.moabsPopped = t),
@@ -84,7 +76,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     () => GetPlayer().Data.ddtsPopped, t => GetPlayer().Data.ddtsPopped = t),
                 new NumberPlayerDataSetting("BADs Popped", VanillaSprites.BadBloonIcon, 0,
                     () => GetPlayer().Data.badsPopped, t => GetPlayer().Data.badsPopped = t),
-                new NumberPlayerDataSetting("Bloons Leaked", VanillaSprites.BloonsTd6LogoIcon, 0,
+                new NumberPlayerDataSetting("Bloons Leaked", VanillaSprites.BloonSendIcon, 0,
                     () => GetPlayer().Data.bloonsLeaked, t => GetPlayer().Data.bloonsLeaked = t),
                 
                 // Original items continue below
@@ -497,32 +489,39 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     // Add method to implement the "Unlock Everything" functionality
     private void UnlockEverything()
     {
-        // Unlock game modes
-        var doubleCashSetting = Settings["General"].Find(s => s.Name == "Unlocked Double Cash") as PurchasePlayerDataSetting;
-        doubleCashSetting?.Unlock();
-        
-        var fastTrackSetting = Settings["General"].Find(s => s.Name == "Unlocked Fast Track") as PurchasePlayerDataSetting;
-        fastTrackSetting?.Unlock();
-        
-        var rogueLegendsSettings = Settings["General"].Find(s => s.Name == "Unlocked Rogue Legends") as PurchasePlayerDataSetting;
-        rogueLegendsSettings?.Unlock();
-        
-        var mapEditorSetting = Settings["General"].Find(s => s.Name == "Unlocked Map Editor") as PurchasePlayerDataSetting;
-        mapEditorSetting?.Unlock();
-        
-        // Set Monkey Money to 795,000
-        GetPlayer().Data.monkeyMoney.Value = 795000;
-        
-        // Trophy Store Items: Unlock all
-        foreach (var setting in Settings["Trophy Store"])
+        try
         {
-            setting.Unlock();
+            // Unlock game modes
+            var doubleCashSetting = Settings["General"].Find(s => s.Name == "Unlocked Double Cash") as PurchasePlayerDataSetting;
+            doubleCashSetting?.Unlock();
+            
+            var fastTrackSetting = Settings["General"].Find(s => s.Name == "Unlocked Fast Track") as PurchasePlayerDataSetting;
+            fastTrackSetting?.Unlock();
+            
+            var rogueLegendsSettings = Settings["General"].Find(s => s.Name == "Unlocked Rogue Legends") as PurchasePlayerDataSetting;
+            rogueLegendsSettings?.Unlock();
+            
+            var mapEditorSetting = Settings["General"].Find(s => s.Name == "Unlocked Map Editor") as PurchasePlayerDataSetting;
+            mapEditorSetting?.Unlock();
+            
+            // Set Monkey Money to 795,000
+            GetPlayer().Data.monkeyMoney.Value = 795000;
+            
+            // Trophy Store Items: Unlock all
+            foreach (var setting in Settings["Trophy Store"])
+            {
+                setting.Unlock();
+            }
+            
+            // Maps: Unlock all
+            foreach (var setting in Settings["Maps"])
+            {
+                setting.Unlock();
+            }
         }
-        
-        // Maps: Unlock all
-        foreach (var setting in Settings["Maps"])
+        catch (Exception e)
         {
-            setting.Unlock();
+            ModHelper.Msg<EditPlayerData>("Error during initial unlocks: " + e.Message);
         }
         
         // Unlock all map badges (both single player and co-op)
@@ -725,6 +724,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         
         // Save changes
         Game.Player.SaveNow();
+        
+        ModHelper.Msg<EditPlayerData>("Successfully unlocked everything!");
     }
 
     public override void OnMenuClosed()
