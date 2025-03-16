@@ -23,7 +23,6 @@ using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
-using Il2CppSystem.Collections.Generic as Il2CppCollections;
 using Il2CppSystem.Linq;
 using Il2CppTMPro;
 using MelonLoader;
@@ -845,22 +844,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
             
             // Import unlocked towers
-            if (profileData.TryGetValue("UnlockedTowers", out var unlockedTowersObj) && unlockedTowersObj is string[] unlockedTowers)
+            if (profileData.TryGetValue("UnlockedTowers", out var unlockedTowersObj))
             {
-                playerData.unlockedTowers.Clear();
-                foreach (var tower in unlockedTowers)
+                if (unlockedTowersObj is Newtonsoft.Json.Linq.JArray unlockedTowersArray)
                 {
-                    playerData.unlockedTowers.Add(tower);
+                    playerData.unlockedTowers.Clear();
+                    foreach (var tower in unlockedTowersArray)
+                    {
+                        playerData.unlockedTowers.Add(tower.ToString());
+                    }
                 }
             }
             
             // Import acquired upgrades
-            if (profileData.TryGetValue("AcquiredUpgrades", out var acquiredUpgradesObj) && acquiredUpgradesObj is string[] acquiredUpgrades)
+            if (profileData.TryGetValue("AcquiredUpgrades", out var acquiredUpgradesObj))
             {
-                playerData.acquiredUpgrades.Clear();
-                foreach (var upgrade in acquiredUpgrades)
+                if (acquiredUpgradesObj is Newtonsoft.Json.Linq.JArray acquiredUpgradesArray)
                 {
-                    playerData.acquiredUpgrades.Add(upgrade);
+                    playerData.acquiredUpgrades.Clear();
+                    foreach (var upgrade in acquiredUpgradesArray)
+                    {
+                        playerData.acquiredUpgrades.Add(upgrade.ToString());
+                    }
                 }
             }
             
@@ -1090,11 +1095,14 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
             
             // Import purchases
-            if (profileData.TryGetValue("Purchases", out var purchasesObj) && purchasesObj is string[] purchases)
+            if (profileData.TryGetValue("Purchases", out var purchasesObj))
             {
-                foreach (var purchaseId in purchases)
+                if (purchasesObj is Newtonsoft.Json.Linq.JArray purchasesArray)
                 {
-                    playerData.purchase.AddOneTimePurchaseItem(purchaseId);
+                    foreach (var purchaseId in purchasesArray)
+                    {
+                        playerData.purchase.AddOneTimePurchaseItem(purchaseId.ToString());
+                    }
                 }
             }
             
