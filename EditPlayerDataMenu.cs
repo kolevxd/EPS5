@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using BTD_Mod_Helper;
 using BTD_Mod_Helper.Api;
@@ -19,10 +20,13 @@ using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
 using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
+using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
+using Il2CppSystem.Collections.Generic as Il2CppCollections;
 using Il2CppSystem.Linq;
 using Il2CppTMPro;
+using MelonLoader;
 using UnityEngine;
 using UnityEngine.UI;
 using Action = System.Action;
@@ -385,6 +389,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private int _pageIdx;
 
     private ModHelperPanel? _topArea;
+    private ModHelperPanel? _bottomArea;
 
     private static Btd6Player GetPlayer()
     {
@@ -448,12 +453,39 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             UpdateVisibleEntries();
         })).AddText(new Info("UnlockAllText", 650, 200), "Unlock All", 60);
         
-        // Add new "Unlock Everything" button
+        // Add "Unlock Everything" button
         _topArea.AddButton(new Info("UnlockEverything", 650, 200), VanillaSprites.GreenBtnLong, new Action(() =>
         {
             UnlockEverything();
             UpdateVisibleEntries();
         })).AddText(new Info("UnlockEverythingText", 650, 200), "Unlock Everything", 60);
+        
+        // Add bottom area for profile import/export buttons
+        _bottomArea = GameMenu.GetComponentFromChildrenByName<RectTransform>("Container").gameObject
+            .AddModHelperPanel(new Info("BottomArea")
+            {
+                Y = 250, Height = 170, Pivot = new Vector2(0.5f, 0),
+                AnchorMin = new Vector2(0, 0), AnchorMax = new Vector2(1, 0)
+            }, VanillaSprites.MainBGPanelBlue, RectTransform.Axis.Horizontal, padding: 50);
+
+        // Add Export Profile button
+        _bottomArea.AddButton(new Info("ExportProfile", 650, 140), VanillaSprites.GreenBtnLong, new Action(() =>
+        {
+            ExportPlayerProfile();
+        })).AddText(new Info("ExportText", 650, 140), "Export Profile", 60);
+        
+        _bottomArea.AddPanel(new Info("Spacing", InfoPreset.Flex));
+        
+        // Add Import Profile button
+        _bottomArea.AddButton(new Info("ImportProfile", 650, 140), VanillaSprites.YellowBtnLong, new Action(() =>
+        {
+            PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
+                "Confirm Profile Import", 
+                "This will overwrite your current profile data. Are you sure you want to continue?",
+                new Action(() => { ImportPlayerProfile(); }), "Yes, Import",
+                new Action(() => { }), "Cancel",
+                Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
+        })).AddText(new Info("ImportText", 650, 140), "Import Profile", 60);
         
         GenerateEntries();
         SetPage(0);
@@ -462,6 +494,622 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         GameMenu.scrollRect.scrollSensitivity = 50;
         
         return false;
+    }
+
+    // Method to export the player profile
+    private void ExportPlayerProfile()
+    {
+        try
+        {
+            var playerData = GetPlayer().Data;
+            var profileData = new Dictionary<string, object>();
+            
+            // Core account data
+            profileData["Rank"] = playerData.rank.ValueInt;
+            profileData["VeteranRank"] = playerData.veteranRank.ValueInt;
+            profileData["XP"] = playerData.xp.ValueLong;
+            profileData["VeteranXP"] = playerData.veteranXp.ValueLong;
+            profileData["MonkeyMoney"] = playerData.monkeyMoney.ValueInt;
+            profileData["Trophies"] = playerData.trophies.ValueInt;
+            profileData["KnowledgePoints"] = playerData.knowledgePoints.ValueInt;
+            
+            // Game statistics
+            profileData["CompletedGame"] = playerData.completedGame;
+            profileData["HighestSeenRound"] = playerData.highestSeenRound;
+            profileData["GoldenBloonsPopped"] = playerData.goldenBloonsPopped;
+            profileData["ConsecutiveDailyChallengesCompleted"] = playerData.consecutiveDailyChallengesCompleted;
+            profileData["TotalDailyChallengesCompleted"] = playerData.totalDailyChallengesCompleted;
+            profileData["HostedCoopGames"] = playerData.hostedCoopGames;
+            profileData["CollectionEventCratesOpened"] = playerData.collectionEventCratesOpened;
+            profileData["DailyRewardIndex"] = playerData.dailyRewardIndex;
+            
+            // Feature unlocks
+            var unlocks = new Dictionary<string, bool>
+            {
+                ["DoubleCash"] = playerData.purchase.HasMadeOneTimePurchase("btd6_doublecashmode"),
+                ["FastTrack"] = playerData.unlockedFastTrack,
+                ["MapEditor"] = playerData.purchase.HasMadeOneTimePurchase("btd6_mapeditorsupporter_new"),
+                ["RogueLegends"] = playerData.purchase.HasMadeOneTimePurchase("btd6_legendsrogue"),
+                ["BigBloons"] = playerData.unlockedBigBloons,
+                ["SmallBloons"] = playerData.unlockedSmallBloons,
+                ["BigMonkeys"] = playerData.unlockedBigTowers,
+                ["SmallMonkeys"] = playerData.unlockedSmallTowers
+            };
+            profileData["Unlocks"] = unlocks;
+            
+            // Monkey Knowledge Points and unlocks
+            profileData["KnowledgePoints"] = playerData.knowledgePoints.ValueInt;
+            var knowledgeData = new Dictionary<string, Dictionary<string, bool>>();
+            foreach (var path in playerData.knowledge.paths)
+            {
+                var pathData = new Dictionary<string, bool>();
+                foreach (var upgrade in path.Value.upgrades)
+                {
+                    pathData[upgrade.Key] = upgrade.Value.unlocked;
+                }
+                knowledgeData[path.Key] = pathData;
+            }
+            profileData["Knowledge"] = knowledgeData;
+            
+            // Tower XP
+            var towerXpData = new Dictionary<string, int>();
+            foreach (var tower in playerData.towerXp)
+            {
+                towerXpData[tower.Key] = tower.Value.ValueInt;
+            }
+            profileData["TowerXP"] = towerXpData;
+            
+            // Unlocked towers
+            profileData["UnlockedTowers"] = playerData.unlockedTowers.ToArray();
+            
+            // Acquired upgrades
+            profileData["AcquiredUpgrades"] = playerData.acquiredUpgrades.ToArray();
+            
+            // Powers
+            var powersData = new Dictionary<string, int>();
+            foreach (var power in playerData.powers)
+            {
+                powersData[power.type] = power.Quantity;
+            }
+            profileData["Powers"] = powersData;
+            
+            // Insta monkeys
+            var instaData = new Dictionary<string, List<Dictionary<string, object>>>();
+            foreach (var towerType in playerData.instaTowers)
+            {
+                var towerInstasData = new List<Dictionary<string, object>>();
+                foreach (var insta in towerType.Value)
+                {
+                    towerInstasData.Add(new Dictionary<string, object>
+                    {
+                        ["Tiers"] = new [] { insta.tier1, insta.tier2, insta.tier3 },
+                        ["Quantity"] = insta.Quantity,
+                        ["Favorite"] = insta.favorite,
+                        ["Sacrificed"] = insta.sacrificed,
+                        ["CosmeticId"] = insta.cosmeticId
+                    });
+                }
+                instaData[towerType.Key] = towerInstasData;
+            }
+            profileData["InstaTowers"] = instaData;
+            
+            // Map data
+            var mapsData = new Dictionary<string, Dictionary<string, object>>();
+            foreach (var map in playerData.mapInfo.maps)
+            {
+                var mapData = new Dictionary<string, object>();
+                mapData["Unlocked"] = playerData.mapInfo.IsMapUnlocked(map.Key);
+                
+                // Single player difficulty modes
+                var spDifficulties = new Dictionary<string, Dictionary<string, object>>();
+                foreach (var difficulty in map.Value.difficult)
+                {
+                    var difficultyData = new Dictionary<string, object>();
+                    var modes = new Dictionary<string, Dictionary<string, object>>();
+                    
+                    foreach (var mode in difficulty.Value.modes)
+                    {
+                        modes[mode.Key] = new Dictionary<string, object>
+                        {
+                            ["TimesCompleted"] = mode.Value.timesCompleted,
+                            ["CompletedWithoutLoadingSave"] = mode.Value.completedWithoutLoadingSave
+                        };
+                    }
+                    
+                    difficultyData["Modes"] = modes;
+                    spDifficulties[difficulty.Key] = difficultyData;
+                }
+                mapData["SinglePlayer"] = spDifficulties;
+                
+                // Co-op difficulty modes
+                var coopDifficulties = new Dictionary<string, Dictionary<string, object>>();
+                foreach (var difficulty in map.Value.difficult)
+                {
+                    var difficultyData = new Dictionary<string, object>();
+                    var modes = new Dictionary<string, Dictionary<string, object>>();
+                    
+                    foreach (var mode in difficulty.Value.coopModes)
+                    {
+                        modes[mode.Key] = new Dictionary<string, object>
+                        {
+                            ["TimesCompleted"] = mode.Value.timesCompleted,
+                            ["CompletedWithoutLoadingSave"] = mode.Value.completedWithoutLoadingSave
+                        };
+                    }
+                    
+                    difficultyData["Modes"] = modes;
+                    coopDifficulties[difficulty.Key] = difficultyData;
+                }
+                mapData["Coop"] = coopDifficulties;
+                
+                mapsData[map.Key] = mapData;
+            }
+            profileData["Maps"] = mapsData;
+            
+            // Boss medals
+            var bossData = new Dictionary<string, Dictionary<string, int>>();
+            foreach (var boss in playerData.bossMedals)
+            {
+                bossData[boss.Key.ToString()] = new Dictionary<string, int>
+                {
+                    ["Normal"] = boss.Value.normalBadges.ValueInt,
+                    ["Elite"] = boss.Value.eliteBadges.ValueInt
+                };
+            }
+            profileData["BossMedals"] = bossData;
+            
+            // Leaderboard medals
+            var leaderboardData = new Dictionary<string, Dictionary<string, int>>();
+            
+            // Boss leaderboard medals
+            var bossLeaderboardData = new Dictionary<string, int>();
+            foreach (var medal in playerData.bossLeaderboardMedals)
+            {
+                bossLeaderboardData[medal.Key.ToString()] = medal.Value.ValueInt;
+            }
+            leaderboardData["Boss"] = bossLeaderboardData;
+            
+            // Elite boss leaderboard medals
+            var eliteBossLeaderboardData = new Dictionary<string, int>();
+            foreach (var medal in playerData.bossLeaderboardEliteMedals)
+            {
+                eliteBossLeaderboardData[medal.Key.ToString()] = medal.Value.ValueInt;
+            }
+            leaderboardData["EliteBoss"] = eliteBossLeaderboardData;
+            
+            // Race leaderboard medals
+            var raceLeaderboardData = new Dictionary<string, int>();
+            foreach (var medal in playerData.raceMedalData)
+            {
+                raceLeaderboardData[medal.Key.ToString()] = medal.Value.ValueInt;
+            }
+            leaderboardData["Race"] = raceLeaderboardData;
+            
+            profileData["LeaderboardMedals"] = leaderboardData;
+            
+            // Trophy store items
+            var trophyStoreData = new Dictionary<string, bool>();
+            foreach (var item in playerData.trophyStorePurchasedItems)
+            {
+                trophyStoreData[item.Key] = item.Value.enabled;
+            }
+            profileData["TrophyStore"] = trophyStoreData;
+            
+            // Current settings
+            var settingsData = new Dictionary<string, object>();
+            settingsData["MusicOn"] = playerData.settings.musicOn;
+            settingsData["SoundEffectsOn"] = playerData.settings.soundEffectsOn;
+            settingsData["AllSoundOn"] = playerData.settings.allSoundOn;
+            settingsData["FastForwardSpeed"] = playerData.settings.fastForwardSpeed;
+            settingsData["AlwaysShowEnemyPath"] = playerData.settings.AlwaysShowEnemyPath;
+            settingsData["AlwaysShowRanges"] = playerData.settings.AlwaysShowRanges;
+            profileData["Settings"] = settingsData;
+            
+            // Save purchases
+            var purchasesData = new List<string>();
+            foreach (var purchase in playerData.purchase.madeOneTimePurchaseItems)
+            {
+                purchasesData.Add(purchase);
+            }
+            profileData["Purchases"] = purchasesData;
+            
+            // Try to save the file
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(profileData, Newtonsoft.Json.Formatting.Indented);
+            string filePath = Path.Combine(MelonEnvironment.ModsDirectory, "PlayerProfileBackup.json");
+            File.WriteAllText(filePath, json);
+            
+            ModHelper.Msg<EditPlayerData>("Profile successfully exported to: " + filePath);
+        }
+        catch (Exception e)
+        {
+            ModHelper.Error<EditPlayerData>("Error exporting profile: " + e.Message);
+        }
+    }
+
+    // Method to import the player profile
+    private void ImportPlayerProfile()
+    {
+        try
+        {
+            string filePath = Path.Combine(MelonEnvironment.ModsDirectory, "PlayerProfileBackup.json");
+            if (!File.Exists(filePath))
+            {
+                ModHelper.Error<EditPlayerData>("Profile backup file not found at: " + filePath);
+                return;
+            }
+            
+            string json = File.ReadAllText(filePath);
+            var profileData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            
+            if (profileData == null)
+            {
+                ModHelper.Error<EditPlayerData>("Failed to parse profile data");
+                return;
+            }
+            
+            var playerData = GetPlayer().Data;
+            
+            // Helper function to get nested values
+            T GetValue<T>(Dictionary<string, object> dict, string key, T defaultValue = default)
+            {
+                if (dict.TryGetValue(key, out var value))
+                {
+                    if (value is T typedValue)
+                    {
+                        return typedValue;
+                    }
+                    
+                    try
+                    {
+                        return (T)Convert.ChangeType(value, typeof(T));
+                    }
+                    catch
+                    {
+                        return defaultValue;
+                    }
+                }
+                return defaultValue;
+            }
+            
+            // Import core account data
+            playerData.rank.Value = Convert.ToInt32(GetValue<object>(profileData, "Rank", 1));
+            playerData.veteranRank.Value = Convert.ToInt32(GetValue<object>(profileData, "VeteranRank", 0));
+            playerData.xp.Value = Convert.ToInt64(GetValue<object>(profileData, "XP", 0));
+            playerData.veteranXp.Value = Convert.ToInt64(GetValue<object>(profileData, "VeteranXP", 0));
+            playerData.monkeyMoney.Value = Convert.ToInt32(GetValue<object>(profileData, "MonkeyMoney", 0));
+            playerData.trophies.Value = Convert.ToInt32(GetValue<object>(profileData, "Trophies", 0));
+            playerData.knowledgePoints.Value = Convert.ToInt32(GetValue<object>(profileData, "KnowledgePoints", 0));
+            
+            // Import game statistics
+            playerData.completedGame = Convert.ToInt32(GetValue<object>(profileData, "CompletedGame", 0));
+            playerData.highestSeenRound = Convert.ToInt32(GetValue<object>(profileData, "HighestSeenRound", 0));
+            playerData.goldenBloonsPopped = Convert.ToInt32(GetValue<object>(profileData, "GoldenBloonsPopped", 0));
+            playerData.consecutiveDailyChallengesCompleted = Convert.ToInt32(GetValue<object>(profileData, "ConsecutiveDailyChallengesCompleted", 0));
+            playerData.totalDailyChallengesCompleted = Convert.ToInt32(GetValue<object>(profileData, "TotalDailyChallengesCompleted", 0));
+            playerData.hostedCoopGames = Convert.ToInt32(GetValue<object>(profileData, "HostedCoopGames", 0));
+            playerData.collectionEventCratesOpened = Convert.ToInt32(GetValue<object>(profileData, "CollectionEventCratesOpened", 0));
+            playerData.dailyRewardIndex = Convert.ToInt32(GetValue<object>(profileData, "DailyRewardIndex", 0));
+            
+            // Import feature unlocks
+            if (profileData.TryGetValue("Unlocks", out var unlocksObj) && unlocksObj is Dictionary<string, object> unlocks)
+            {
+                bool doubleCash = GetValue<bool>(unlocks, "DoubleCash", false);
+                if (doubleCash)
+                {
+                    playerData.purchase.AddOneTimePurchaseItem("btd6_doublecashmode");
+                }
+                else
+                {
+                    playerData.purchase.RemoveOneTimePurchaseItem("btd6_doublecashmode");
+                }
+                
+                playerData.unlockedFastTrack = GetValue<bool>(unlocks, "FastTrack", false);
+                
+                bool mapEditor = GetValue<bool>(unlocks, "MapEditor", false);
+                if (mapEditor)
+                {
+                    playerData.purchase.AddOneTimePurchaseItem("btd6_mapeditorsupporter_new");
+                }
+                else
+                {
+                    playerData.purchase.RemoveOneTimePurchaseItem("btd6_mapeditorsupporter_new");
+                }
+                
+                bool rogueLegends = GetValue<bool>(unlocks, "RogueLegends", false);
+                if (rogueLegends)
+                {
+                    playerData.purchase.AddOneTimePurchaseItem("btd6_legendsrogue");
+                }
+                else
+                {
+                    playerData.purchase.RemoveOneTimePurchaseItem("btd6_legendsrogue");
+                }
+                
+                playerData.unlockedBigBloons = GetValue<bool>(unlocks, "BigBloons", false);
+                playerData.unlockedSmallBloons = GetValue<bool>(unlocks, "SmallBloons", false);
+                playerData.unlockedBigTowers = GetValue<bool>(unlocks, "BigMonkeys", false);
+                playerData.unlockedSmallTowers = GetValue<bool>(unlocks, "SmallMonkeys", false);
+            }
+            
+            // Import tower XP
+            if (profileData.TryGetValue("TowerXP", out var towerXpObj) && towerXpObj is Dictionary<string, object> towerXpData)
+            {
+                foreach (var tower in towerXpData)
+                {
+                    if (!playerData.towerXp.ContainsKey(tower.Key))
+                    {
+                        playerData.towerXp[tower.Key] = new KonFuze_NoShuffle();
+                    }
+                    playerData.towerXp[tower.Key].Value = Convert.ToInt32(tower.Value);
+                }
+            }
+            
+            // Import unlocked towers
+            if (profileData.TryGetValue("UnlockedTowers", out var unlockedTowersObj) && unlockedTowersObj is string[] unlockedTowers)
+            {
+                playerData.unlockedTowers.Clear();
+                foreach (var tower in unlockedTowers)
+                {
+                    playerData.unlockedTowers.Add(tower);
+                }
+            }
+            
+            // Import acquired upgrades
+            if (profileData.TryGetValue("AcquiredUpgrades", out var acquiredUpgradesObj) && acquiredUpgradesObj is string[] acquiredUpgrades)
+            {
+                playerData.acquiredUpgrades.Clear();
+                foreach (var upgrade in acquiredUpgrades)
+                {
+                    playerData.acquiredUpgrades.Add(upgrade);
+                }
+            }
+            
+            // Import powers
+            if (profileData.TryGetValue("Powers", out var powersObj) && powersObj is Dictionary<string, object> powersData)
+            {
+                foreach (var power in powersData)
+                {
+                    if (GetPlayer().IsPowerAvailable(power.Key))
+                    {
+                        GetPlayer().GetPowerData(power.Key).Quantity = Convert.ToInt32(power.Value);
+                    }
+                    else
+                    {
+                        GetPlayer().AddPower(power.Key, Convert.ToInt32(power.Value));
+                    }
+                }
+            }
+            
+            // Import insta monkeys
+            if (profileData.TryGetValue("InstaTowers", out var instaObj) && instaObj is Dictionary<string, object> instaData)
+            {
+                // Clear existing instas
+                foreach (var tower in playerData.instaTowers)
+                {
+                    tower.Value.Clear();
+                }
+                
+                // Add imported instas
+                foreach (var towerType in instaData)
+                {
+                    if (towerType.Value is Newtonsoft.Json.Linq.JArray towerInstas)
+                    {
+                        foreach (var instaJObj in towerInstas)
+                        {
+                            try
+                            {
+                                var instaTower = new InstaTowerModel();
+                                
+                                if (instaJObj["Tiers"] is Newtonsoft.Json.Linq.JArray tiersArray)
+                                {
+                                    instaTower.tier1 = Convert.ToInt32(tiersArray[0]);
+                                    instaTower.tier2 = Convert.ToInt32(tiersArray[1]);
+                                    instaTower.tier3 = Convert.ToInt32(tiersArray[2]);
+                                }
+                                
+                                instaTower.Quantity = Convert.ToInt32(instaJObj["Quantity"] ?? 1);
+                                instaTower.favorite = Convert.ToBoolean(instaJObj["Favorite"] ?? false);
+                                instaTower.sacrificed = Convert.ToBoolean(instaJObj["Sacrificed"] ?? false);
+                                instaTower.cosmeticId = Convert.ToString(instaJObj["CosmeticId"] ?? "");
+                                
+                                GetPlayer().GetInstaTower(towerType.Key, new[] { instaTower.tier1, instaTower.tier2, instaTower.tier3 }).Quantity = instaTower.Quantity;
+                            }
+                            catch (Exception e)
+                            {
+                                ModHelper.Warning<EditPlayerData>($"Error importing insta monkey: {e.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Import map data
+            if (profileData.TryGetValue("Maps", out var mapsObj) && mapsObj is Dictionary<string, object> mapsData)
+            {
+                foreach (var mapEntry in mapsData)
+                {
+                    var mapInfo = playerData.mapInfo.GetMap(mapEntry.Key);
+                    
+                    if (mapEntry.Value is Dictionary<string, object> mapData)
+                    {
+                        // Unlock map if needed
+                        bool isUnlocked = GetValue<bool>(mapData, "Unlocked", false);
+                        if (isUnlocked && !playerData.mapInfo.IsMapUnlocked(mapEntry.Key))
+                        {
+                            playerData.mapInfo.UnlockMap(mapEntry.Key);
+                        }
+                        
+                        // Import single player mode data
+                        if (mapData.TryGetValue("SinglePlayer", out var spObj) && spObj is Dictionary<string, object> spDifficulties)
+                        {
+                            foreach (var difficulty in spDifficulties)
+                            {
+                                if (difficulty.Value is Dictionary<string, object> difficultyData && 
+                                    difficultyData.TryGetValue("Modes", out var modesObj) && 
+                                    modesObj is Dictionary<string, object> modes)
+                                {
+                                    foreach (var mode in modes)
+                                    {
+                                        if (mode.Value is Dictionary<string, object> modeData)
+                                        {
+                                            var modeInfo = mapInfo.GetOrCreateDifficulty(difficulty.Key).GetOrCreateMode(mode.Key, false);
+                                            modeInfo.timesCompleted = Convert.ToInt32(GetValue<object>(modeData, "TimesCompleted", 0));
+                                            modeInfo.completedWithoutLoadingSave = GetValue<bool>(modeData, "CompletedWithoutLoadingSave", false);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Import co-op mode data
+                        if (mapData.TryGetValue("Coop", out var coopObj) && coopObj is Dictionary<string, object> coopDifficulties)
+                        {
+                            foreach (var difficulty in coopDifficulties)
+                            {
+                                if (difficulty.Value is Dictionary<string, object> difficultyData && 
+                                    difficultyData.TryGetValue("Modes", out var modesObj) && 
+                                    modesObj is Dictionary<string, object> modes)
+                                {
+                                    foreach (var mode in modes)
+                                    {
+                                        if (mode.Value is Dictionary<string, object> modeData)
+                                        {
+                                            var modeInfo = mapInfo.GetOrCreateDifficulty(difficulty.Key).GetOrCreateMode(mode.Key, true);
+                                            modeInfo.timesCompleted = Convert.ToInt32(GetValue<object>(modeData, "TimesCompleted", 0));
+                                            modeInfo.completedWithoutLoadingSave = GetValue<bool>(modeData, "CompletedWithoutLoadingSave", false);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Import boss medals
+            if (profileData.TryGetValue("BossMedals", out var bossObj) && bossObj is Dictionary<string, object> bossData)
+            {
+                foreach (var boss in bossData)
+                {
+                    if (int.TryParse(boss.Key, out int bossId) && boss.Value is Dictionary<string, object> medalData)
+                    {
+                        if (!playerData.bossMedals.ContainsKey(bossId))
+                        {
+                            playerData.bossMedals[bossId] = new BossMedalSaveData();
+                        }
+                        
+                        playerData.bossMedals[bossId].normalBadges.Value = Convert.ToInt32(GetValue<object>(medalData, "Normal", 0));
+                        playerData.bossMedals[bossId].eliteBadges.Value = Convert.ToInt32(GetValue<object>(medalData, "Elite", 0));
+                    }
+                }
+            }
+            
+            // Import leaderboard medals
+            if (profileData.TryGetValue("LeaderboardMedals", out var leaderboardObj) && leaderboardObj is Dictionary<string, object> leaderboardData)
+            {
+                // Boss leaderboard medals
+                if (leaderboardData.TryGetValue("Boss", out var bossLeaderboardObj) && bossLeaderboardObj is Dictionary<string, object> bossLeaderboardData)
+                {
+                    foreach (var medal in bossLeaderboardData)
+                    {
+                        if (int.TryParse(medal.Key, out int medalId))
+                        {
+                            if (!playerData.bossLeaderboardMedals.ContainsKey(medalId))
+                            {
+                                playerData.bossLeaderboardMedals[medalId] = new KonFuze_NoShuffle();
+                            }
+                            
+                            playerData.bossLeaderboardMedals[medalId].Value = Convert.ToInt32(medal.Value);
+                        }
+                    }
+                }
+                
+                // Elite boss leaderboard medals
+                if (leaderboardData.TryGetValue("EliteBoss", out var eliteBossLeaderboardObj) && eliteBossLeaderboardObj is Dictionary<string, object> eliteBossLeaderboardData)
+                {
+                    foreach (var medal in eliteBossLeaderboardData)
+                    {
+                        if (int.TryParse(medal.Key, out int medalId))
+                        {
+                            if (!playerData.bossLeaderboardEliteMedals.ContainsKey(medalId))
+                            {
+                                playerData.bossLeaderboardEliteMedals[medalId] = new KonFuze_NoShuffle();
+                            }
+                            
+                            playerData.bossLeaderboardEliteMedals[medalId].Value = Convert.ToInt32(medal.Value);
+                        }
+                    }
+                }
+                
+                // Race leaderboard medals
+                if (leaderboardData.TryGetValue("Race", out var raceLeaderboardObj) && raceLeaderboardObj is Dictionary<string, object> raceLeaderboardData)
+                {
+                    foreach (var medal in raceLeaderboardData)
+                    {
+                        if (int.TryParse(medal.Key, out int medalId))
+                        {
+                            if (!playerData.raceMedalData.ContainsKey(medalId))
+                            {
+                                playerData.raceMedalData[medalId] = new KonFuze_NoShuffle();
+                            }
+                            
+                            playerData.raceMedalData[medalId].Value = Convert.ToInt32(medal.Value);
+                        }
+                    }
+                }
+            }
+            
+            // Import trophy store items
+            if (profileData.TryGetValue("TrophyStore", out var trophyStoreObj) && trophyStoreObj is Dictionary<string, object> trophyStoreData)
+            {
+                foreach (var item in trophyStoreData)
+                {
+                    bool enabled = Convert.ToBoolean(item.Value);
+                    
+                    if (!playerData.trophyStorePurchasedItems.ContainsKey(item.Key) && enabled)
+                    {
+                        GetPlayer().AddTrophyStoreItem(item.Key);
+                    }
+                    
+                    if (playerData.trophyStorePurchasedItems.ContainsKey(item.Key))
+                    {
+                        playerData.trophyStorePurchasedItems[item.Key].enabled = enabled;
+                    }
+                }
+            }
+            
+            // Import settings
+            if (profileData.TryGetValue("Settings", out var settingsObj) && settingsObj is Dictionary<string, object> settingsData)
+            {
+                playerData.settings.musicOn = GetValue<bool>(settingsData, "MusicOn", true);
+                playerData.settings.soundEffectsOn = GetValue<bool>(settingsData, "SoundEffectsOn", true);
+                playerData.settings.allSoundOn = GetValue<bool>(settingsData, "AllSoundOn", true);
+                playerData.settings.fastForwardSpeed = GetValue<float>(settingsData, "FastForwardSpeed", 3f);
+                playerData.settings.AlwaysShowEnemyPath = GetValue<bool>(settingsData, "AlwaysShowEnemyPath", false);
+                playerData.settings.AlwaysShowRanges = GetValue<bool>(settingsData, "AlwaysShowRanges", false);
+            }
+            
+            // Import purchases
+            if (profileData.TryGetValue("Purchases", out var purchasesObj) && purchasesObj is string[] purchases)
+            {
+                foreach (var purchaseId in purchases)
+                {
+                    playerData.purchase.AddOneTimePurchaseItem(purchaseId);
+                }
+            }
+            
+            // Save changes
+            GetPlayer().SaveNow();
+            
+            // Update UI
+            UpdateVisibleEntries();
+            
+            ModHelper.Msg<EditPlayerData>("Profile successfully imported!");
+        }
+        catch (Exception e)
+        {
+            ModHelper.Error<EditPlayerData>("Error importing profile: " + e.Message);
+        }
     }
 
     // Add method to implement the "Unlock Everything" functionality
