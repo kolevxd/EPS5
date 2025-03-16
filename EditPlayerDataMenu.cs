@@ -22,7 +22,6 @@ using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
-using Il2CppNewtonsoft.Json;
 using Il2CppNinjaKiwi.Common;
 using Il2CppSystem.Linq;
 using Il2CppTMPro;
@@ -41,9 +40,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             "General", new List<PlayerDataSetting>
             {
-                new BoolPlayerDataSetting("Export Profile", VanillaSprites.SaveBtn, false,
+                new BoolPlayerDataSetting("Export Profile", VanillaSprites.GreenBtn, false,
                     () => false, _ => ExportProfile()),
-                new BoolPlayerDataSetting("Import Profile", VanillaSprites.LoadBtn, false,
+                new BoolPlayerDataSetting("Import Profile", VanillaSprites.BlueBtn, false,
                     () => false, _ => ImportProfile()),
                 new BoolPlayerDataSetting("Unlock Everything", VanillaSprites.GreenBtn, false,
                     () => false, _ => UnlockEverything()),
@@ -393,7 +392,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel _topArea;
+    private ModHelperPanel? _topArea;
 
     private static Btd6Player GetPlayer()
     {
@@ -408,47 +407,53 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             // Get a simplified view of player data to export
             var playerData = Game.Player.Data;
             
-            // Create a string dictionary to serialize
-            var exportDict = new Dictionary<string, object>();
+            // Create a string to store the JSON data
+            var jsonString = "{\n";
             
             // Add basic currencies and statistics
-            exportDict["monkeyMoney"] = playerData.monkeyMoney.ValueInt;
-            exportDict["knowledgePoints"] = playerData.knowledgePoints.ValueInt;
-            exportDict["trophies"] = playerData.trophies.ValueInt;
-            exportDict["rank"] = playerData.rank.ValueInt;
-            exportDict["veteranRank"] = playerData.veteranRank.ValueInt;
-            exportDict["xp"] = playerData.xp.ValueInt;
-            exportDict["completedGame"] = playerData.completedGame;
-            exportDict["highestSeenRound"] = playerData.highestSeenRound;
+            jsonString += $"  \"monkeyMoney\": {playerData.monkeyMoney.ValueInt},\n";
+            jsonString += $"  \"knowledgePoints\": {playerData.knowledgePoints.ValueInt},\n";
+            jsonString += $"  \"trophies\": {playerData.trophies.ValueInt},\n";
+            jsonString += $"  \"rank\": {playerData.rank.ValueInt},\n";
+            jsonString += $"  \"veteranRank\": {playerData.veteranRank.ValueInt},\n";
+            jsonString += $"  \"xp\": {playerData.xp.ValueInt},\n";
+            jsonString += $"  \"completedGame\": {playerData.completedGame},\n";
+            jsonString += $"  \"highestSeenRound\": {playerData.highestSeenRound},\n";
             
             // Add unlocks
-            exportDict["unlockedFastTrack"] = playerData.unlockedFastTrack;
-            exportDict["unlockedBigBloons"] = playerData.unlockedBigBloons;
-            exportDict["unlockedSmallBloons"] = playerData.unlockedSmallBloons;
-            exportDict["unlockedBigTowers"] = playerData.unlockedBigTowers;
-            exportDict["unlockedSmallTowers"] = playerData.unlockedSmallTowers;
+            jsonString += $"  \"unlockedFastTrack\": {playerData.unlockedFastTrack.ToString().ToLower()},\n";
+            jsonString += $"  \"unlockedBigBloons\": {playerData.unlockedBigBloons.ToString().ToLower()},\n";
+            jsonString += $"  \"unlockedSmallBloons\": {playerData.unlockedSmallBloons.ToString().ToLower()},\n";
+            jsonString += $"  \"unlockedBigTowers\": {playerData.unlockedBigTowers.ToString().ToLower()},\n";
+            jsonString += $"  \"unlockedSmallTowers\": {playerData.unlockedSmallTowers.ToString().ToLower()},\n";
             
             // Add one-time purchases
-            var purchasesList = new List<string>();
-            foreach (var purchase in playerData.purchase.oneTimePurchases)
+            jsonString += "  \"purchases\": [\n";
+            var purchaseItems = new List<string>();
+            for (var i = 0; i < playerData.purchase.oneTimePurchaseItems.Length; i++)
             {
-                purchasesList.Add(purchase);
+                purchaseItems.Add($"    \"{playerData.purchase.oneTimePurchaseItems[i]}\"");
             }
-            exportDict["purchases"] = purchasesList;
+            jsonString += string.Join(",\n", purchaseItems);
+            jsonString += "\n  ],\n";
             
             // Add tower XP
-            var towerXpDict = new Dictionary<string, int>();
+            jsonString += "  \"towerXp\": {\n";
+            var towerXpItems = new List<string>();
             foreach (var kvp in playerData.towerXp)
             {
-                towerXpDict[kvp.Key] = kvp.Value.ValueInt;
+                towerXpItems.Add($"    \"{kvp.Key}\": {kvp.Value.ValueInt}");
             }
-            exportDict["towerXp"] = towerXpDict;
+            jsonString += string.Join(",\n", towerXpItems);
+            jsonString += "\n  }\n";
+            
+            // Close the JSON object
+            jsonString += "}";
             
             // Get a file path in the game's directory
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), "PlayerDataExport.json");
             
-            // Serialize and save the data
-            var jsonString = JsonConvert.SerializeObject(exportDict, Formatting.Indented);
+            // Save the JSON data to file
             File.WriteAllText(filePath, jsonString);
             
             // Show success message
@@ -475,6 +480,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 return;
             }
             
+            // Read JSON file content
+            var jsonContent = File.ReadAllText(filePath);
+            
             // Confirm with the user
             PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
                 "Import Profile Data", 
@@ -483,74 +491,73 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 {
                     try
                     {
-                        // Read the JSON file
-                        var jsonString = File.ReadAllText(filePath);
-                        var importData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                        // Since we can't easily use JSON parsing, we'll manually parse simple values
                         var playerData = Game.Player.Data;
                         
-                        // Helper function to get value from the dictionary
-                        T GetValue<T>(string key, T defaultValue = default)
+                        // Helper function to extract value from JSON content
+                        int ExtractInt(string key)
                         {
-                            if (importData.TryGetValue(key, out var value))
-                            {
-                                if (value is T typedValue)
-                                    return typedValue;
-                                
-                                // Handle numeric conversions
-                                if (typeof(T) == typeof(int) && value is long longValue)
-                                    return (T)(object)Convert.ToInt32(longValue);
-                                
-                                if (typeof(T) == typeof(long) && value is int intValue)
-                                    return (T)(object)Convert.ToInt64(intValue);
-                                
-                                if (typeof(T) == typeof(bool) && value is bool boolValue)
-                                    return (T)(object)boolValue;
-                            }
-                            
-                            return defaultValue;
+                            var pattern = $"\"{key}\": (\\d+)";
+                            var match = System.Text.RegularExpressions.Regex.Match(jsonContent, pattern);
+                            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+                        }
+                        
+                        bool ExtractBool(string key)
+                        {
+                            var pattern = $"\"{key}\": (true|false)";
+                            var match = System.Text.RegularExpressions.Regex.Match(jsonContent, pattern);
+                            return match.Success && match.Groups[1].Value == "true";
                         }
                         
                         // Apply basic currencies and statistics
-                        playerData.monkeyMoney.Value = GetValue<int>("monkeyMoney");
-                        playerData.knowledgePoints.Value = GetValue<int>("knowledgePoints");
-                        playerData.trophies.Value = GetValue<int>("trophies");
-                        playerData.rank.Value = GetValue<int>("rank");
-                        playerData.veteranRank.Value = GetValue<int>("veteranRank");
-                        playerData.xp.Value = GetValue<long>("xp");
-                        playerData.completedGame = GetValue<int>("completedGame");
-                        playerData.highestSeenRound = GetValue<int>("highestSeenRound");
+                        playerData.monkeyMoney.Value = ExtractInt("monkeyMoney");
+                        playerData.knowledgePoints.Value = ExtractInt("knowledgePoints");
+                        playerData.trophies.Value = ExtractInt("trophies");
+                        playerData.rank.Value = ExtractInt("rank");
+                        playerData.veteranRank.Value = ExtractInt("veteranRank");
+                        playerData.xp.Value = ExtractInt("xp");
+                        playerData.completedGame = ExtractInt("completedGame");
+                        playerData.highestSeenRound = ExtractInt("highestSeenRound");
                         
                         // Apply unlocks
-                        playerData.unlockedFastTrack = GetValue<bool>("unlockedFastTrack");
-                        playerData.unlockedBigBloons = GetValue<bool>("unlockedBigBloons");
-                        playerData.unlockedSmallBloons = GetValue<bool>("unlockedSmallBloons");
-                        playerData.unlockedBigTowers = GetValue<bool>("unlockedBigTowers");
-                        playerData.unlockedSmallTowers = GetValue<bool>("unlockedSmallTowers");
+                        playerData.unlockedFastTrack = ExtractBool("unlockedFastTrack");
+                        playerData.unlockedBigBloons = ExtractBool("unlockedBigBloons");
+                        playerData.unlockedSmallBloons = ExtractBool("unlockedSmallBloons");
+                        playerData.unlockedBigTowers = ExtractBool("unlockedBigTowers");
+                        playerData.unlockedSmallTowers = ExtractBool("unlockedSmallTowers");
                         
-                        // Apply one-time purchases if present
-                        if (importData.TryGetValue("purchases", out var purchasesObj) && purchasesObj is List<object> purchasesList)
+                        // Apply one-time purchases (simple approach)
+                        var purchasePattern = "\"purchases\":\\s*\\[([^\\]]+)\\]";
+                        var purchaseMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, purchasePattern, System.Text.RegularExpressions.RegexOptions.Singleline);
+                        if (purchaseMatch.Success)
                         {
-                            foreach (var purchaseObj in purchasesList)
+                            var purchasesText = purchaseMatch.Groups[1].Value;
+                            var itemPattern = "\"([^\"]+)\"";
+                            var itemMatches = System.Text.RegularExpressions.Regex.Matches(purchasesText, itemPattern);
+                            
+                            foreach (System.Text.RegularExpressions.Match itemMatch in itemMatches)
                             {
-                                if (purchaseObj is string purchase && !playerData.purchase.HasMadeOneTimePurchase(purchase))
+                                var purchaseId = itemMatch.Groups[1].Value;
+                                if (!playerData.purchase.HasMadeOneTimePurchase(purchaseId))
                                 {
-                                    playerData.purchase.AddOneTimePurchaseItem(purchase);
+                                    playerData.purchase.AddOneTimePurchaseItem(purchaseId);
                                 }
                             }
                         }
                         
-                        // Apply tower XP if present
-                        if (importData.TryGetValue("towerXp", out var towerXpObj) && towerXpObj is Dictionary<string, object> towerXpDict)
+                        // Apply tower XP (simple approach)
+                        var towerXpPattern = "\"towerXp\":\\s*\\{([^}]+)\\}";
+                        var towerXpMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, towerXpPattern, System.Text.RegularExpressions.RegexOptions.Singleline);
+                        if (towerXpMatch.Success)
                         {
-                            foreach (var kvp in towerXpDict)
+                            var towerXpText = towerXpMatch.Groups[1].Value;
+                            var itemPattern = "\"([^\"]+)\":\\s*(\\d+)";
+                            var itemMatches = System.Text.RegularExpressions.Regex.Matches(towerXpText, itemPattern);
+                            
+                            foreach (System.Text.RegularExpressions.Match itemMatch in itemMatches)
                             {
-                                var towerId = kvp.Key;
-                                int xpValue = 0;
-                                
-                                if (kvp.Value is int intValue)
-                                    xpValue = intValue;
-                                else if (kvp.Value is long longValue)
-                                    xpValue = Convert.ToInt32(longValue);
+                                var towerId = itemMatch.Groups[1].Value;
+                                var xpValue = int.Parse(itemMatch.Groups[2].Value);
                                 
                                 if (!playerData.towerXp.ContainsKey(towerId))
                                 {
@@ -577,7 +584,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 }), 
                 "Import", 
                 new Action(() => {}), 
-                "Cancel");
+                "Cancel",
+                Popup.TransitionAnim.Scale,
+                PopupScreen.BackGround.Grey);
         }
         catch (Exception e)
         {
@@ -604,7 +613,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     playerData.trophies.Value = 9999;
                     
                     // Unlock all maps
-                    foreach (var details in GameData.Instance.mapSet.StandardMaps)
+                    foreach (var details in GameData.Instance.mapSet.StandardMaps.ToIl2CppList())
                     {
                         if (!playerData.mapInfo.IsMapUnlocked(details.id))
                         {
@@ -671,7 +680,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 }), 
                 "Unlock All", 
                 new Action(() => {}), 
-                "Cancel");
+                "Cancel",
+                Popup.TransitionAnim.Scale,
+                PopupScreen.BackGround.Grey);
         }
         catch (Exception e)
         {
@@ -771,8 +782,14 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
-        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        var unlockAllBtn = _topArea?.GetDescendent<ModHelperButton>("UnlockAll");
+        var unlockAllFiller = _topArea?.GetDescendent<ModHelperPanel>("UnlockAll Filler");
+        
+        if (unlockAllBtn != null)
+            unlockAllBtn.SetActive(anyUnlockable);
+        
+        if (unlockAllFiller != null)
+            unlockAllFiller.SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
