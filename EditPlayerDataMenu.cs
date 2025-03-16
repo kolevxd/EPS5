@@ -427,15 +427,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             jsonString += $"  \"unlockedBigTowers\": {playerData.unlockedBigTowers.ToString().ToLower()},\n";
             jsonString += $"  \"unlockedSmallTowers\": {playerData.unlockedSmallTowers.ToString().ToLower()},\n";
             
-            // Add one-time purchases
-            jsonString += "  \"purchases\": [\n";
-            var purchaseItems = new List<string>();
-            for (var i = 0; i < playerData.purchase.oneTimePurchaseItems.Length; i++)
-            {
-                purchaseItems.Add($"    \"{playerData.purchase.oneTimePurchaseItems[i]}\"");
-            }
-            jsonString += string.Join(",\n", purchaseItems);
-            jsonString += "\n  ],\n";
+            // Skip one-time purchases since we don't have an easy way to enumerate them
             
             // Add tower XP
             jsonString += "  \"towerXp\": {\n";
@@ -525,25 +517,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                         playerData.unlockedSmallBloons = ExtractBool("unlockedSmallBloons");
                         playerData.unlockedBigTowers = ExtractBool("unlockedBigTowers");
                         playerData.unlockedSmallTowers = ExtractBool("unlockedSmallTowers");
-                        
-                        // Apply one-time purchases (simple approach)
-                        var purchasePattern = "\"purchases\":\\s*\\[([^\\]]+)\\]";
-                        var purchaseMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, purchasePattern, System.Text.RegularExpressions.RegexOptions.Singleline);
-                        if (purchaseMatch.Success)
-                        {
-                            var purchasesText = purchaseMatch.Groups[1].Value;
-                            var itemPattern = "\"([^\"]+)\"";
-                            var itemMatches = System.Text.RegularExpressions.Regex.Matches(purchasesText, itemPattern);
-                            
-                            foreach (System.Text.RegularExpressions.Match itemMatch in itemMatches)
-                            {
-                                var purchaseId = itemMatch.Groups[1].Value;
-                                if (!playerData.purchase.HasMadeOneTimePurchase(purchaseId))
-                                {
-                                    playerData.purchase.AddOneTimePurchaseItem(purchaseId);
-                                }
-                            }
-                        }
                         
                         // Apply tower XP (simple approach)
                         var towerXpPattern = "\"towerXp\":\\s*\\{([^}]+)\\}";
