@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BTD_Mod_Helper;
@@ -255,7 +255,7 @@ public class PurchasePlayerDataSetting : BoolPlayerDataSetting
 
 public class MapPlayerDataSetting : PlayerDataSetting
 {
-    private static readonly Dictionary<string, string[]> Difficulties = new()
+    public static readonly Dictionary<string, string[]> Difficulties = new()
     {
         { "Easy", new []{ "Standard", "PrimaryOnly", "Deflation" } },
         { "Medium", new []{ "Standard", "MilitaryOnly", "Reverse", "Apopalypse" } },
