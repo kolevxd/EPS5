@@ -408,7 +408,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Maps - Coop"].Insert(0, new CustomPanelSetting("Apply Medal Template (Co-op)", coopMapsPanel));
     }
 
-    // Custom setting to display a panel
     public class CustomPanelSetting : PlayerDataSetting
     {
         private readonly ModHelperPanel _panel;
