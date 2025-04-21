@@ -30,6 +30,7 @@ using UnityEngine.UI;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
+using Random = System.Random;
 
 namespace EditPlayerData.UI;
 
@@ -382,61 +383,123 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 }));
         }
         
-        // Add mass edit buttons to each section
-        AddMassEditButtons();
+        // Dodaj przyciski dla masowego ustawiania XP
+        Settings["Tower XP"].Insert(0, new BoolPlayerDataSetting("Set XP for All Towers", VanillaSprites.GreenBtn, false,
+            () => false, _ => ShowSetAllTowerXpPopup()));
+        
+        // Dodaj przycisk dla masowego ustawiania mocy
+        Settings["Powers"].Insert(0, new BoolPlayerDataSetting("Set Quantity for All Powers", VanillaSprites.GreenBtn, false,
+            () => false, _ => ShowSetAllPowersPopup()));
     }
 
-    private static void AddMassEditButtons()
+    // Masowe ustawianie XP dla wszystkich małpek
+    private static void ShowSetAllTowerXpPopup()
     {
-        // Create a panel for the Tower XP mass edit button
-        var towerXpPanel = ModHelperPanel.Create(new Info("MassSetTowerXP", 800, 150));
-        MassEditFeatures.AddMassSetTowerXpButton(towerXpPanel);
-        Settings["Tower XP"].Insert(0, new CustomPanelSetting("Set XP for All Towers", towerXpPanel));
+        var fixedValue = 500000;
+        
+        var popup = PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
+            "Set XP for All Towers", 
+            "Set XP for all towers at once.",
+            new Action(() =>
+            {
+                var player = Game.Player;
+                var towers = Game.instance.GetTowerDetailModels();
+                
+                foreach (var tower in towers)
+                {
+                    if (!player.Data.towerXp.ContainsKey(tower.towerId))
+                    {
+                        player.Data.towerXp[tower.towerId] = new KonFuze_NoShuffle(fixedValue);
+                    }
+                    else
+                    {
+                        player.Data.towerXp[tower.towerId].Value = fixedValue;
+                    }
+                }
+                
+                // Save changes
+                player.SaveNow();
+                
+                PopupScreen.instance.ShowOkPopup("XP has been applied to all towers!");
+            }), 
+            "Apply", 
+            new Action(() => {}), 
+            "Cancel",
+            Popup.TransitionAnim.Scale, 
+            PopupScreen.BackGround.Grey);
 
-        // Create a panel for the Powers mass edit button
-        var powersPanel = ModHelperPanel.Create(new Info("MassSetPowers", 800, 150));
-        MassEditFeatures.AddMassSetPowersButton(powersPanel);
-        Settings["Powers"].Insert(0, new CustomPanelSetting("Set Quantity for All Powers", powersPanel));
-
-        // Create panels for the medal template buttons
-        var mapsPanel = ModHelperPanel.Create(new Info("ApplyMedalTemplate", 800, 150));
-        MassEditFeatures.AddApplyMedalTemplateButton(mapsPanel, false);
-        Settings["Maps"].Insert(0, new CustomPanelSetting("Apply Medal Template", mapsPanel));
-
-        var coopMapsPanel = ModHelperPanel.Create(new Info("ApplyMedalTemplateCoop", 800, 150));
-        MassEditFeatures.AddApplyMedalTemplateButton(coopMapsPanel, true);
-        Settings["Maps - Coop"].Insert(0, new CustomPanelSetting("Apply Medal Template (Co-op)", coopMapsPanel));
+        var layout = popup.FindObject("Layout");
+        
+        // Fixed value input
+        layout.AddText(new Info("FixedLabel", 800, 50), "XP Value for All Towers:", 60);
+        var fixedInput = layout.AddInputField(new Info("FixedInput", 500, 100), 
+            fixedValue.ToString(), VanillaSprites.BlueInsertPanelRound, 
+            new Action<string>(value => 
+            {
+                if (int.TryParse(value, out int result))
+                {
+                    fixedValue = result;
+                }
+            }), 60, TMP_InputField.CharacterValidation.Digit);
+            
+        // Add spacing
+        layout.AddModHelperPanel(new Info("Spacing", 800, 50));
     }
 
-    public class CustomPanelSetting : PlayerDataSetting
+    // Masowe ustawianie mocy
+    private static void ShowSetAllPowersPopup()
     {
-        private readonly ModHelperPanel _panel;
+        var quantity = 100;
+        
+        var popup = PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
+            "Set All Powers", 
+            "Set the same quantity for all powers at once.",
+            new Action(() =>
+            {
+                var player = Game.Player;
+                var powers = Game.instance.model.powers;
+                
+                foreach (var power in powers)
+                {
+                    if (power.name is "CaveMonkey" or "DungeonStatue" or "SpookyCreature") continue;
+                    
+                    if (player.IsPowerAvailable(power.name))
+                    {
+                        player.GetPowerData(power.name).Quantity = quantity;
+                    }
+                    else
+                    {
+                        player.AddPower(power.name, quantity);
+                    }
+                }
+                
+                // Save changes
+                player.SaveNow();
+                
+                PopupScreen.instance.ShowOkPopup("Quantity has been applied to all powers!");
+            }), 
+            "Apply", 
+            new Action(() => {}), 
+            "Cancel",
+            Popup.TransitionAnim.Scale, 
+            PopupScreen.BackGround.Grey);
 
-        public CustomPanelSetting(string name, ModHelperPanel panel) : base(name, "")
-        {
-            _panel = panel;
-        }
-
-        protected override ModHelperComponent GetValue()
-        {
-            return _panel;
-        }
-
-        protected override void ShowEditValuePopup(PopupScreen screen)
-        {
-            // This is intentionally empty as the panel itself has the functionality
-        }
-
-        public override void ResetToDefault()
-        {
-            // No reset needed
-        }
-
-        public override ModHelperImage GetIcon()
-        {
-            // Empty icon
-            return ModHelperImage.Create(new Info("Icon") { X = -50, Size = 350 }, VanillaSprites.BlueBtn);
-        }
+        var layout = popup.FindObject("Layout");
+        
+        // Quantity input
+        layout.AddText(new Info("QuantityLabel", 800, 50), "Quantity for all powers:", 60);
+        var quantityInput = layout.AddInputField(new Info("QuantityInput", 500, 100), 
+            quantity.ToString(), VanillaSprites.BlueInsertPanelRound, 
+            new Action<string>(value => 
+            {
+                if (int.TryParse(value, out int result))
+                {
+                    quantity = result;
+                }
+            }), 60, TMP_InputField.CharacterValidation.Digit);
+            
+        // Add spacing
+        layout.AddModHelperPanel(new Info("Spacing", 800, 50));
     }
 
     private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
