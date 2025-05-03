@@ -46,8 +46,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 new PurchasePlayerDataSetting("Unlocked Rogue Legends", VanillaSprites.LegendsBtn, "btd6_legendsrogue"),
                 new PurchasePlayerDataSetting("Unlocked Map Editor", VanillaSprites.MapEditorBtn, "btd6_mapeditorsupporter_new"),
                 
-                // Dodane odflagowanie konta
-                new BoolPlayerDataSetting("Unflag Account", VanillaSprites.WarningIcon, false,
+                // Dodane odflagowanie konta - użyjemy innej ikony
+                new BoolPlayerDataSetting("Unflag Account", VanillaSprites.SettingsBtn, false,
                     () => GetPlayer().IsFlagged,
                     val => {
                         try {
@@ -406,7 +406,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel _topArea;
+    private ModHelperPanel? _topArea;  // Dodano nullable
 
     private static Btd6Player GetPlayer()
     {
@@ -504,8 +504,11 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
-        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        if (_topArea != null)  // Dodano null check
+        {
+            _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+            _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        }
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
