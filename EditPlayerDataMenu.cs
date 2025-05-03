@@ -408,7 +408,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.DartMonkeyIcon, 0,
                 () => statsData.monkeysPlaced, t => statsData.monkeysPlaced = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.BlueBloonIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.RedBloon, 0,
                 () => (int)statsData.bloonsPopped, t => statsData.bloonsPopped = t));
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
                 () => (int)statsData.cashEarned, t => statsData.cashEarned = t));
@@ -416,15 +416,15 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 () => statsData.instaMonkeysUsed, t => statsData.instaMonkeysUsed = t));
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
                 () => statsData.powersUsed, t => statsData.powersUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn2, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesIcon, 0,
                 () => statsData.abilitiesUsed, t => statsData.abilitiesUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.CoopIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.CoOpIcon, 0,
                 () => (int)statsData.coopCashGiven, t => statsData.coopCashGiven = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossRoundsIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BADIcon, 0,
                 () => (int)statsData.damageDoneToBosses, t => statsData.damageDoneToBosses = t));
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.AlchemistIcon, 0,
                 () => statsData.transformingTonicsUsed, t => statsData.transformingTonicsUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.NecromancerIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.UndeadBloonIcon, 0,
                 () => (int)statsData.necroBloonsReanimated, t => statsData.necroBloonsReanimated = t));
         }
     }
@@ -604,7 +604,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
                 VanillaSprites.GreenBtnLong, new Action(() =>
             {
-                PopupScreen.instance.ShowSpacedPopup(PopupScreen.Placement.inGameCenter, 
+                PopupScreen.instance.ShowSetNamePopup(PopupScreen.Placement.inGameCenter, 
                     "Set Tower XP Range", 
                     "Enter minimum and maximum XP values (e.g. 1000000-5000000)",
                     new Action<string>(result =>
