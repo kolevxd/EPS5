@@ -19,6 +19,7 @@ using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
 using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
+using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
 using Il2CppSystem.Linq;
@@ -407,7 +408,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.DartMonkeyIcon, 0,
                 () => statsData.monkeysPlaced, t => statsData.monkeysPlaced = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.RedBloonIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.BlueBloonIcon, 0,
                 () => (int)statsData.bloonsPopped, t => statsData.bloonsPopped = t));
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
                 () => (int)statsData.cashEarned, t => statsData.cashEarned = t));
@@ -415,20 +416,20 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 () => statsData.instaMonkeysUsed, t => statsData.instaMonkeysUsed = t));
             Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
                 () => statsData.powersUsed, t => statsData.powersUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn2, 0,
                 () => statsData.abilitiesUsed, t => statsData.abilitiesUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.TeamworkIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.CoopIcon, 0,
                 () => (int)statsData.coopCashGiven, t => statsData.coopCashGiven = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossesIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossRoundsIcon, 0,
                 () => (int)statsData.damageDoneToBosses, t => statsData.damageDoneToBosses = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.TransformationTonic, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.AlchemistIcon, 0,
                 () => statsData.transformingTonicsUsed, t => statsData.transformingTonicsUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.UndeadBloonsUpgradeIcon, 0,
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.NecromancerIcon, 0,
                 () => (int)statsData.necroBloonsReanimated, t => statsData.necroBloonsReanimated = t));
         }
     }
 
-    private static dynamic GetPlayerStats()
+    private static dynamic? GetPlayerStats()
     {
         try
         {
@@ -664,7 +665,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 VanillaSprites.GreenBtnLong, new Action(() =>
             {
                 var coop = _category == "Maps - Coop";
-                var maps = GameData.Instance.mapSet.StandardMaps.ToList();
+                var maps = GameData.Instance.mapSet.StandardMaps.ToArray().ToList();
                 var rng = new Random();
                 var selectedMap = maps[rng.Next(maps.Count)];
                 
