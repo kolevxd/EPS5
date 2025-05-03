@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection; // Dodane dla refleksji
+using System.Reflection;
 using BTD_Mod_Helper;
 using BTD_Mod_Helper.Api;
 using BTD_Mod_Helper.Api.Components;
@@ -28,6 +28,7 @@ using UnityEngine.UI;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
+using Random = System.Random;
 
 namespace EditPlayerData.UI;
 
@@ -144,6 +145,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         },
         {
             "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+        },
+        {
+            "Player Stats", new List<PlayerDataSetting>() // new category
         }
     };
 
@@ -160,6 +164,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Powers"].Clear();
         Settings["Instas"].Clear();
         Settings["Online Modes"].Clear();
+        Settings["Player Stats"].Clear();
         
         foreach (var item in GameData.Instance.trophyStoreItems.GetAllItems())
         {
@@ -395,6 +400,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     GetPlayer().GetCtLeaderboardBadges(true)[(int)leaderboard].Value = t;
                 }));
         }
+
+        // New Player Stats category
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.AddRemoveBtn, 0,
+            () => GetPlayer().Data.monkeysPlaced, t => GetPlayer().Data.monkeysPlaced = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.PopCountIcon, 0,
+            () => (int)GetPlayer().Data.bloonsPopped.Value, t => GetPlayer().Data.bloonsPopped.Value = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
+            () => (int)GetPlayer().Data.cashEarned.Value, t => GetPlayer().Data.cashEarned.Value = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Insta Monkeys Used", VanillaSprites.InstaTowersIcon, 0,
+            () => GetPlayer().Data.instaMonkeysUsed, t => GetPlayer().Data.instaMonkeysUsed = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
+            () => GetPlayer().Data.powersUsed, t => GetPlayer().Data.powersUsed = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn, 0,
+            () => GetPlayer().Data.abilitiesUsed, t => GetPlayer().Data.abilitiesUsed = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.TeamworkIcon, 0,
+            () => (int)GetPlayer().Data.coopCashGiven.Value, t => GetPlayer().Data.coopCashGiven.Value = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossesIcon, 0,
+            () => (int)GetPlayer().Data.damageDoneToBosses, t => GetPlayer().Data.damageDoneToBosses = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.TransformationTonic, 0,
+            () => GetPlayer().Data.transformingTonicsUsed, t => GetPlayer().Data.transformingTonicsUsed = t));
+        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.NecromancerIcon, 0,
+            () => (int)GetPlayer().Data.bloonsReanimated.Value, t => GetPlayer().Data.bloonsReanimated.Value = t));
     }
 
     private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
@@ -510,6 +537,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
         }
 
+        // Add special action buttons
+        AddSpecialActionButtons();
+
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
         
@@ -531,6 +561,108 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 entry.SetSetting(settings[idx]);
                 entry.SetActive(true);
             }
+        }
+    }
+
+    private void AddSpecialActionButtons()
+    {
+        // Remove existing special buttons first
+        if (_topArea != null)
+        {
+            var specialButton = _topArea.GetDescendent<ModHelperButton>("SpecialActionButton");
+            if (specialButton != null)
+            {
+                specialButton.gameObject.Destroy();
+            }
+        }
+
+        if (_category == "Tower XP" && _topArea != null)
+        {
+            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
+                VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSpacedPopup(PopupScreen.Placement.inGameCenter, 
+                    "Set Tower XP Range", 
+                    "Enter minimum and maximum XP values (e.g. 1000000-5000000)",
+                    new Action<string>(result =>
+                    {
+                        var parts = result.Split('-');
+                        if (parts.Length == 2 && int.TryParse(parts[0], out int min) && int.TryParse(parts[1], out int max))
+                        {
+                            var rng = new Random();
+                            foreach (var tower in Game.instance.GetTowerDetailModels())
+                            {
+                                var xp = rng.Next(min, max + 1);
+                                var data = GetPlayer().Data;
+                                if (!data.towerXp.ContainsKey(tower.towerId))
+                                {
+                                    data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
+                                }
+                                else
+                                {
+                                    data.towerXp[tower.towerId].Value = xp;
+                                }
+                            }
+                            UpdateVisibleEntries();
+                        }
+                    }), "1000000-5000000");
+            }));
+            button.AddText(new Info("UnlockAllText", 650, 200), "Set XP Range", 50);
+        }
+        else if (_category == "Powers" && _topArea != null)
+        {
+            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
+                VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Set All Powers", 
+                    "Enter value to set for all powers", 
+                    new Action<int>(value =>
+                    {
+                        foreach (var power in Game.instance.model.powers)
+                        {
+                            if (power.name is "CaveMonkey" or "DungeonStatue" or "SpookyCreature") continue;
+                            
+                            if (GetPlayer().IsPowerAvailable(power.name))
+                            {
+                                GetPlayer().GetPowerData(power.name).Quantity = value;
+                            }
+                            else
+                            {
+                                GetPlayer().AddPower(power.name, value);
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 400);
+            }));
+            button.AddText(new Info("UnlockAllText", 650, 200), "Set All Powers", 50);
+        }
+        else if ((_category == "Maps" || _category == "Maps - Coop") && _topArea != null)
+        {
+            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
+                VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                var coop = _category == "Maps - Coop";
+                var maps = GameData.Instance.mapSet.StandardMaps.ToList();
+                var rng = new Random();
+                var selectedMap = maps[rng.Next(maps.Count)];
+                
+                PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
+                    "Random Map Medals", 
+                    $"Select medals for: {LocalizationManager.Instance.Format(selectedMap.id)}", 
+                    new Action(() =>
+                    {
+                        // Apply the same medal configuration to random map
+                        var mapInfo = GetPlayer().Data.mapInfo.GetMap(selectedMap.id);
+                        if (!GetPlayer().Data.mapInfo.IsMapUnlocked(selectedMap.id))
+                        {
+                            GetPlayer().Data.mapInfo.UnlockMap(selectedMap.id);
+                        }
+                        
+                        UpdateVisibleEntries();
+                    }), "OK", new Action(() => {}), "Cancel", 
+                    Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
+            }));
+            button.AddText(new Info("UnlockAllText", 650, 200), "Random Medals", 50);
         }
     }
 
