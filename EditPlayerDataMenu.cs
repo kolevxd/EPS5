@@ -604,32 +604,35 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
                 VanillaSprites.GreenBtnLong, new Action(() =>
             {
-                PopupScreen.instance.ShowStringInputPopup(
-                    "Set Tower XP Range", 
-                    "Enter minimum and maximum XP values (e.g. 1000000-5000000)",
-                    new Action<string>(result =>
+                // Use two separate popups for min and max values
+                PopupScreen.instance.ShowSetValuePopup("Set Minimum XP", 
+                    "Enter minimum XP value", 
+                    new Action<int>(min =>
                     {
-                        var parts = result.Split('-');
-                        if (parts.Length == 2 && int.TryParse(parts[0], out int min) && int.TryParse(parts[1], out int max))
-                        {
-                            var rng = new Random();
-                            foreach (var tower in Game.instance.GetTowerDetailModels())
+                        PopupScreen.instance.ShowSetValuePopup("Set Maximum XP", 
+                            "Enter maximum XP value", 
+                            new Action<int>(max =>
                             {
-                                var xp = rng.Next(min, max + 1);
-                                var data = GetPlayer().Data;
-                                if (!data.towerXp.ContainsKey(tower.towerId))
+                                if (max > min)
                                 {
-                                    data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
+                                    var rng = new Random();
+                                    foreach (var tower in Game.instance.GetTowerDetailModels())
+                                    {
+                                        var xp = rng.Next(min, max + 1);
+                                        var data = GetPlayer().Data;
+                                        if (!data.towerXp.ContainsKey(tower.towerId))
+                                        {
+                                            data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
+                                        }
+                                        else
+                                        {
+                                            data.towerXp[tower.towerId].Value = xp;
+                                        }
+                                    }
+                                    UpdateVisibleEntries();
                                 }
-                                else
-                                {
-                                    data.towerXp[tower.towerId].Value = xp;
-                                }
-                            }
-                            UpdateVisibleEntries();
-                        }
-                    }), 
-                    "1000000-5000000");
+                            }), 5000000);
+                    }), 1000000);
             }));
             button.AddText(new Info("UnlockAllText", 650, 200), "Set XP Range", 50);
         }
