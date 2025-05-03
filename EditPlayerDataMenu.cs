@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Reflection; // Dodane dla refleksji
 using BTD_Mod_Helper;
 using BTD_Mod_Helper.Api;
 using BTD_Mod_Helper.Api.Components;
 using BTD_Mod_Helper.Api.Enums;
 using BTD_Mod_Helper.Extensions;
-using EditPlayerData.UI;
 using HarmonyLib;
 using Il2Cpp;
 using Il2CppAssets.Scripts.Data;
@@ -20,7 +19,6 @@ using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
 using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
-using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
 using Il2CppSystem.Linq;
@@ -40,12 +38,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             "General", new List<PlayerDataSetting>
             {
-                new BoolPlayerDataSetting("Export Profile", VanillaSprites.GreenBtn, false,
-                    () => false, _ => ExportProfile()),
-                new BoolPlayerDataSetting("Import Profile", VanillaSprites.BlueBtn, false,
-                    () => false, _ => ImportProfile()),
-                new BoolPlayerDataSetting("Unlock Everything", VanillaSprites.GreenBtn, false,
-                    () => false, _ => UnlockEverything()),
                 new PurchasePlayerDataSetting("Unlocked Double Cash", VanillaSprites.DoubleCashModeShop, "btd6_doublecashmode"),
                 new PurchasePlayerDataSetting("Unlocked Fast Track", VanillaSprites.FastTrackModeIcon,
                     "btd6_fasttrackpack",
@@ -53,6 +45,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     t => GetPlayer().Data.unlockedFastTrack = t),
                 new PurchasePlayerDataSetting("Unlocked Rogue Legends", VanillaSprites.LegendsBtn, "btd6_legendsrogue"),
                 new PurchasePlayerDataSetting("Unlocked Map Editor", VanillaSprites.MapEditorBtn, "btd6_mapeditorsupporter_new"),
+                
+                // Dodane odflagowanie konta
+                new BoolPlayerDataSetting("Unflag Account", VanillaSprites.WarningIcon, false,
+                    () => GetPlayer().IsFlagged,
+                    val => {
+                        try {
+                            // Użyj refleksji aby ustawić prywatną właściwość
+                            var playerType = GetPlayer().GetType();
+                            var isFlaggedProperty = playerType.GetProperty("IsFlagged");
+                            if (isFlaggedProperty != null) {
+                                var setter = isFlaggedProperty.GetSetMethod(true); // true = include private
+                                if (setter != null) {
+                                    setter.Invoke(GetPlayer(), new object[] { false });
+                                    ModHelper.Msg<EditPlayerData>("Account unflagged locally");
+                                }
+                            }
+                        } catch (Exception ex) {
+                            ModHelper.Error<EditPlayerData>($"Failed to unflag account: {ex.Message}");
+                        }
+                    }
+                ),
+                
                 new NumberPlayerDataSetting("Monkey Money", VanillaSprites.MonkeyMoneyShop, 0,
                     () => GetPlayer().Data.monkeyMoney.ValueInt, t => GetPlayer().Data.monkeyMoney.Value = t),
                 new NumberPlayerDataSetting("Monkey Knowledge", VanillaSprites.KnowledgeIcon, 0,
@@ -392,276 +406,11 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel? _topArea;
+    private ModHelperPanel _topArea;
 
     private static Btd6Player GetPlayer()
     {
         return Game.Player;
-    }
-
-    // Export player data to a JSON file
-    private static void ExportProfile()
-    {
-        try
-        {
-            // Get a simplified view of player data to export
-            var playerData = Game.Player.Data;
-            
-            // Create a string to store the JSON data
-            var jsonString = "{\n";
-            
-            // Add basic currencies and statistics
-            jsonString += $"  \"monkeyMoney\": {playerData.monkeyMoney.ValueInt},\n";
-            jsonString += $"  \"knowledgePoints\": {playerData.knowledgePoints.ValueInt},\n";
-            jsonString += $"  \"trophies\": {playerData.trophies.ValueInt},\n";
-            jsonString += $"  \"rank\": {playerData.rank.ValueInt},\n";
-            jsonString += $"  \"veteranRank\": {playerData.veteranRank.ValueInt},\n";
-            jsonString += $"  \"xp\": {playerData.xp.ValueInt},\n";
-            jsonString += $"  \"completedGame\": {playerData.completedGame},\n";
-            jsonString += $"  \"highestSeenRound\": {playerData.highestSeenRound},\n";
-            
-            // Add unlocks
-            jsonString += $"  \"unlockedFastTrack\": {playerData.unlockedFastTrack.ToString().ToLower()},\n";
-            jsonString += $"  \"unlockedBigBloons\": {playerData.unlockedBigBloons.ToString().ToLower()},\n";
-            jsonString += $"  \"unlockedSmallBloons\": {playerData.unlockedSmallBloons.ToString().ToLower()},\n";
-            jsonString += $"  \"unlockedBigTowers\": {playerData.unlockedBigTowers.ToString().ToLower()},\n";
-            jsonString += $"  \"unlockedSmallTowers\": {playerData.unlockedSmallTowers.ToString().ToLower()},\n";
-            
-            // Skip one-time purchases since we don't have an easy way to enumerate them
-            
-            // Add tower XP
-            jsonString += "  \"towerXp\": {\n";
-            var towerXpItems = new List<string>();
-            foreach (var kvp in playerData.towerXp)
-            {
-                towerXpItems.Add($"    \"{kvp.Key}\": {kvp.Value.ValueInt}");
-            }
-            jsonString += string.Join(",\n", towerXpItems);
-            jsonString += "\n  }\n";
-            
-            // Close the JSON object
-            jsonString += "}";
-            
-            // Get a file path in the game's directory
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "PlayerDataExport.json");
-            
-            // Save the JSON data to file
-            File.WriteAllText(filePath, jsonString);
-            
-            // Show success message
-            PopupScreen.instance.ShowOkPopup($"Profile exported successfully to:\n{filePath}");
-        }
-        catch (Exception e)
-        {
-            ModHelper.Msg<EditPlayerData>("Error exporting profile: " + e.Message);
-            PopupScreen.instance.ShowOkPopup("Error exporting profile:\n" + e.Message);
-        }
-    }
-
-    // Import player data from a JSON file
-    private static void ImportProfile()
-    {
-        try
-        {
-            // Get file path in the game's directory
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "PlayerDataExport.json");
-            
-            if (!File.Exists(filePath))
-            {
-                PopupScreen.instance.ShowOkPopup($"Profile data file not found at:\n{filePath}");
-                return;
-            }
-            
-            // Read JSON file content
-            var jsonContent = File.ReadAllText(filePath);
-            
-            // Confirm with the user
-            PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
-                "Import Profile Data", 
-                "Are you sure you want to import player data?\nThis will overwrite your current profile data.",
-                new Action(() => 
-                {
-                    try
-                    {
-                        // Since we can't easily use JSON parsing, we'll manually parse simple values
-                        var playerData = Game.Player.Data;
-                        
-                        // Helper function to extract value from JSON content
-                        int ExtractInt(string key)
-                        {
-                            var pattern = $"\"{key}\": (\\d+)";
-                            var match = System.Text.RegularExpressions.Regex.Match(jsonContent, pattern);
-                            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
-                        }
-                        
-                        bool ExtractBool(string key)
-                        {
-                            var pattern = $"\"{key}\": (true|false)";
-                            var match = System.Text.RegularExpressions.Regex.Match(jsonContent, pattern);
-                            return match.Success && match.Groups[1].Value == "true";
-                        }
-                        
-                        // Apply basic currencies and statistics
-                        playerData.monkeyMoney.Value = ExtractInt("monkeyMoney");
-                        playerData.knowledgePoints.Value = ExtractInt("knowledgePoints");
-                        playerData.trophies.Value = ExtractInt("trophies");
-                        playerData.rank.Value = ExtractInt("rank");
-                        playerData.veteranRank.Value = ExtractInt("veteranRank");
-                        playerData.xp.Value = ExtractInt("xp");
-                        playerData.completedGame = ExtractInt("completedGame");
-                        playerData.highestSeenRound = ExtractInt("highestSeenRound");
-                        
-                        // Apply unlocks
-                        playerData.unlockedFastTrack = ExtractBool("unlockedFastTrack");
-                        playerData.unlockedBigBloons = ExtractBool("unlockedBigBloons");
-                        playerData.unlockedSmallBloons = ExtractBool("unlockedSmallBloons");
-                        playerData.unlockedBigTowers = ExtractBool("unlockedBigTowers");
-                        playerData.unlockedSmallTowers = ExtractBool("unlockedSmallTowers");
-                        
-                        // Apply tower XP (simple approach)
-                        var towerXpPattern = "\"towerXp\":\\s*\\{([^}]+)\\}";
-                        var towerXpMatch = System.Text.RegularExpressions.Regex.Match(jsonContent, towerXpPattern, System.Text.RegularExpressions.RegexOptions.Singleline);
-                        if (towerXpMatch.Success)
-                        {
-                            var towerXpText = towerXpMatch.Groups[1].Value;
-                            var itemPattern = "\"([^\"]+)\":\\s*(\\d+)";
-                            var itemMatches = System.Text.RegularExpressions.Regex.Matches(towerXpText, itemPattern);
-                            
-                            foreach (System.Text.RegularExpressions.Match itemMatch in itemMatches)
-                            {
-                                var towerId = itemMatch.Groups[1].Value;
-                                var xpValue = int.Parse(itemMatch.Groups[2].Value);
-                                
-                                if (!playerData.towerXp.ContainsKey(towerId))
-                                {
-                                    playerData.towerXp[towerId] = new KonFuze_NoShuffle(xpValue);
-                                }
-                                else
-                                {
-                                    playerData.towerXp[towerId].Value = xpValue;
-                                }
-                            }
-                        }
-                        
-                        // Save changes
-                        Game.Player.SaveNow();
-                        
-                        // Show success message
-                        PopupScreen.instance.ShowOkPopup("Profile imported successfully!");
-                    }
-                    catch (Exception e)
-                    {
-                        ModHelper.Msg<EditPlayerData>("Error during import: " + e.Message);
-                        PopupScreen.instance.ShowOkPopup("Error during import:\n" + e.Message);
-                    }
-                }), 
-                "Import", 
-                new Action(() => {}), 
-                "Cancel",
-                Popup.TransitionAnim.Scale,
-                PopupScreen.BackGround.Grey);
-        }
-        catch (Exception e)
-        {
-            ModHelper.Msg<EditPlayerData>("Error importing profile: " + e.Message);
-            PopupScreen.instance.ShowOkPopup("Error importing profile:\n" + e.Message);
-        }
-    }
-
-    // Unlock everything - towers, maps, modes, currencies
-    private static void UnlockEverything()
-    {
-        try
-        {
-            PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
-                "Unlock Everything", 
-                "This will unlock all towers, maps, modes, and set high values for currencies. Continue?",
-                new Action(() => 
-                {
-                    var playerData = Game.Player.Data;
-                    
-                    // Set currencies to high values
-                    playerData.monkeyMoney.Value = 999999;
-                    playerData.knowledgePoints.Value = 9999;
-                    playerData.trophies.Value = 9999;
-                    
-                    // Unlock all maps
-                    foreach (var details in GameData.Instance.mapSet.StandardMaps.ToIl2CppList())
-                    {
-                        if (!playerData.mapInfo.IsMapUnlocked(details.id))
-                        {
-                            playerData.mapInfo.UnlockMap(details.id);
-                        }
-                    }
-                    
-                    // Unlock all towers
-                    foreach (var tower in Game.instance.GetTowerDetailModels())
-                    {
-                        if (!playerData.unlockedTowers.Contains(tower.towerId))
-                        {
-                            Game.instance.towerGoalUnlockManager.CompleteGoalForTower(tower.towerId);
-                            playerData.UnlockTower(tower.towerId);
-                        }
-                        
-                        // Give XP to each tower
-                        if (!playerData.towerXp.ContainsKey(tower.towerId))
-                        {
-                            playerData.towerXp[tower.towerId] = new KonFuze_NoShuffle(500000);
-                        }
-                        else
-                        {
-                            playerData.towerXp[tower.towerId].Value = 500000;
-                        }
-                        
-                        // Unlock all upgrades
-                        var model = Game.instance.model;
-                        var upgrades = model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
-                            .Concat(model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
-                            .Concat(model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades);
-                        
-                        foreach (var upgrade in upgrades)
-                        {
-                            playerData.acquiredUpgrades.Add(upgrade);
-                        }
-                        
-                        // Try to unlock paragon
-                        var paragon = Game.instance.model.GetParagonUpgradeForTowerId(tower.towerId);
-                        if (paragon != null)
-                        {
-                            playerData.acquiredUpgrades.Add(paragon.name);
-                        }
-                    }
-                    
-                    // Unlock premium features
-                    playerData.unlockedFastTrack = true;
-                    playerData.unlockedBigBloons = true;
-                    playerData.unlockedSmallBloons = true;
-                    playerData.unlockedBigTowers = true;
-                    playerData.unlockedSmallTowers = true;
-                    
-                    // Add premium purchases
-                    playerData.purchase.AddOneTimePurchaseItem("btd6_doublecashmode");
-                    playerData.purchase.AddOneTimePurchaseItem("btd6_fasttrackpack");
-                    playerData.purchase.AddOneTimePurchaseItem("btd6_legendsrogue");
-                    playerData.purchase.AddOneTimePurchaseItem("btd6_mapeditorsupporter_new");
-                    
-                    // Save changes
-                    Game.Player.SaveNow();
-                    
-                    // Show success message
-                    PopupScreen.instance.ShowOkPopup("Everything has been unlocked successfully!");
-                }), 
-                "Unlock All", 
-                new Action(() => {}), 
-                "Cancel",
-                Popup.TransitionAnim.Scale,
-                PopupScreen.BackGround.Grey);
-        }
-        catch (Exception e)
-        {
-            ModHelper.Msg<EditPlayerData>("Error unlocking everything: " + e.Message);
-            PopupScreen.instance.ShowOkPopup("Error unlocking everything:\n" + e.Message);
-        }
     }
 
     public override bool OnMenuOpened(Object data)
@@ -755,14 +504,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        var unlockAllBtn = _topArea?.GetDescendent<ModHelperButton>("UnlockAll");
-        var unlockAllFiller = _topArea?.GetDescendent<ModHelperPanel>("UnlockAll Filler");
-        
-        if (unlockAllBtn != null)
-            unlockAllBtn.SetActive(anyUnlockable);
-        
-        if (unlockAllFiller != null)
-            unlockAllFiller.SetActive(!anyUnlockable);
+        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
