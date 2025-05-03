@@ -401,27 +401,49 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 }));
         }
 
-        // New Player Stats category
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.AddRemoveBtn, 0,
-            () => GetPlayer().Data.monkeysPlaced, t => GetPlayer().Data.monkeysPlaced = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.PopCountIcon, 0,
-            () => (int)GetPlayer().Data.bloonsPopped.Value, t => GetPlayer().Data.bloonsPopped.Value = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
-            () => (int)GetPlayer().Data.cashEarned.Value, t => GetPlayer().Data.cashEarned.Value = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Insta Monkeys Used", VanillaSprites.InstaTowersIcon, 0,
-            () => GetPlayer().Data.instaMonkeysUsed, t => GetPlayer().Data.instaMonkeysUsed = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
-            () => GetPlayer().Data.powersUsed, t => GetPlayer().Data.powersUsed = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn, 0,
-            () => GetPlayer().Data.abilitiesUsed, t => GetPlayer().Data.abilitiesUsed = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.TeamworkIcon, 0,
-            () => (int)GetPlayer().Data.coopCashGiven.Value, t => GetPlayer().Data.coopCashGiven.Value = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossesIcon, 0,
-            () => (int)GetPlayer().Data.damageDoneToBosses, t => GetPlayer().Data.damageDoneToBosses = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.TransformationTonic, 0,
-            () => GetPlayer().Data.transformingTonicsUsed, t => GetPlayer().Data.transformingTonicsUsed = t));
-        Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.NecromancerIcon, 0,
-            () => (int)GetPlayer().Data.bloonsReanimated.Value, t => GetPlayer().Data.bloonsReanimated.Value = t));
+        // New Player Stats category - using reflection to access stats
+        var statsData = GetPlayerStats();
+        if (statsData != null)
+        {
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.DartMonkeyIcon, 0,
+                () => statsData.monkeysPlaced, t => statsData.monkeysPlaced = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.RedBloonIcon, 0,
+                () => (int)statsData.bloonsPopped, t => statsData.bloonsPopped = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
+                () => (int)statsData.cashEarned, t => statsData.cashEarned = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Insta Monkeys Used", VanillaSprites.InstaMonkeyIcon, 0,
+                () => statsData.instaMonkeysUsed, t => statsData.instaMonkeysUsed = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
+                () => statsData.powersUsed, t => statsData.powersUsed = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.AbilitiesBtn, 0,
+                () => statsData.abilitiesUsed, t => statsData.abilitiesUsed = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.TeamworkIcon, 0,
+                () => (int)statsData.coopCashGiven, t => statsData.coopCashGiven = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BossesIcon, 0,
+                () => (int)statsData.damageDoneToBosses, t => statsData.damageDoneToBosses = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.TransformationTonic, 0,
+                () => statsData.transformingTonicsUsed, t => statsData.transformingTonicsUsed = t));
+            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.UndeadBloonsUpgradeIcon, 0,
+                () => (int)statsData.necroBloonsReanimated, t => statsData.necroBloonsReanimated = t));
+        }
+    }
+
+    private static dynamic GetPlayerStats()
+    {
+        try
+        {
+            var playerType = GetPlayer().GetType();
+            var statsProperty = playerType.GetProperty("Stats", BindingFlags.Public | BindingFlags.Instance);
+            if (statsProperty != null)
+            {
+                return statsProperty.GetValue(GetPlayer());
+            }
+        }
+        catch (Exception ex)
+        {
+            ModHelper.Warning<EditPlayerData>($"Could not get player stats: {ex.Message}");
+        }
+        return null;
     }
 
     private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
