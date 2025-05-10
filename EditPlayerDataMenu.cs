@@ -378,8 +378,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
     }
 
-    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue)) / EntriesPerPage;
-
     public override bool OnMenuOpened(Object data)
     {
         _isOpen = true;
