@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using BTD_Mod_Helper;
 using BTD_Mod_Helper.Api;
 using BTD_Mod_Helper.Api.Components;
@@ -19,7 +18,6 @@ using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
 using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
-using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
 using Il2CppSystem.Linq;
@@ -29,7 +27,6 @@ using UnityEngine.UI;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
-using Random = System.Random;
 
 namespace EditPlayerData.UI;
 
@@ -47,28 +44,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     t => GetPlayer().Data.unlockedFastTrack = t),
                 new PurchasePlayerDataSetting("Unlocked Rogue Legends", VanillaSprites.LegendsBtn, "btd6_legendsrogue"),
                 new PurchasePlayerDataSetting("Unlocked Map Editor", VanillaSprites.MapEditorBtn, "btd6_mapeditorsupporter_new"),
-                
-                // Dodane odflagowanie konta - użyjemy innej ikony
-                new BoolPlayerDataSetting("Unflag Account", VanillaSprites.SettingsBtn, false,
-                    () => GetPlayer().IsFlagged,
-                    val => {
-                        try {
-                            // Użyj refleksji aby ustawić prywatną właściwość
-                            var playerType = GetPlayer().GetType();
-                            var isFlaggedProperty = playerType.GetProperty("IsFlagged");
-                            if (isFlaggedProperty != null) {
-                                var setter = isFlaggedProperty.GetSetMethod(true); // true = include private
-                                if (setter != null) {
-                                    setter.Invoke(GetPlayer(), new object[] { false });
-                                    ModHelper.Msg<EditPlayerData>("Account unflagged locally");
-                                }
-                            }
-                        } catch (Exception ex) {
-                            ModHelper.Error<EditPlayerData>($"Failed to unflag account: {ex.Message}");
-                        }
-                    }
-                ),
-                
                 new NumberPlayerDataSetting("Monkey Money", VanillaSprites.MonkeyMoneyShop, 0,
                     () => GetPlayer().Data.monkeyMoney.ValueInt, t => GetPlayer().Data.monkeyMoney.Value = t),
                 new NumberPlayerDataSetting("Monkey Knowledge", VanillaSprites.KnowledgeIcon, 0,
@@ -127,34 +102,36 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         },
         {
-            "Trophy Store", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values             
+            "Trophy Store", new List<PlayerDataSetting>()             
         },
         {
-            "Maps", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Maps", new List<PlayerDataSetting>()
         },
         {
-            "Maps - Coop", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Maps - Coop", new List<PlayerDataSetting>()
         },
         {
-            "Tower XP", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Tower XP", new List<PlayerDataSetting>()
         },
         {
-            "Powers", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Powers", new List<PlayerDataSetting>()
         },
         {
-            "Instas", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Instas", new List<PlayerDataSetting>()
         },
         {
-            "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
-        },
-        {
-            "Player Stats", new List<PlayerDataSetting>() // new category
+            "Online Modes", new List<PlayerDataSetting>()
         }
     };
 
     private static bool _isOpen;
-
     private const int EntriesPerPage = 5;
+    private static TMP_InputField? _searchInput;
+    private string _searchValue = "";
+    private string _category = "General";
+    private int _pageIdx;
+    private ModHelperPanel _topArea;
+    private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
 
     public static void InitSettings(ProfileModel data)
     {
@@ -165,7 +142,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Powers"].Clear();
         Settings["Instas"].Clear();
         Settings["Online Modes"].Clear();
-        Settings["Player Stats"].Clear();
         
         foreach (var item in GameData.Instance.trophyStoreItems.GetAllItems())
         {
@@ -178,7 +154,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 () => Game.Player.AddTrophyStoreItem(item.id)));
         }
 
-        
         foreach (var details in GameData.Instance.mapSet.StandardMaps.ToIl2CppList())
         {
             Settings["Maps"].Add(new MapPlayerDataSetting(details, data.mapInfo.GetMap(details.id), false)
@@ -401,67 +376,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     GetPlayer().GetCtLeaderboardBadges(true)[(int)leaderboard].Value = t;
                 }));
         }
-
-        // New Player Stats category - using reflection to access stats
-        var statsData = GetPlayerStats();
-        if (statsData != null)
-        {
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Monkeys Placed", VanillaSprites.DartMonkeyIcon, 0,
-                () => statsData.monkeysPlaced, t => statsData.monkeysPlaced = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Bloons Popped", VanillaSprites.BadBloonIcon, 0,
-                () => (int)statsData.bloonsPopped, t => statsData.bloonsPopped = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Cash Earned", VanillaSprites.CoinIcon, 0,
-                () => (int)statsData.cashEarned, t => statsData.cashEarned = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Insta Monkeys Used", VanillaSprites.InstaMonkeyIcon, 0,
-                () => statsData.instaMonkeysUsed, t => statsData.instaMonkeysUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Powers Used", VanillaSprites.PowersIcon, 0,
-                () => statsData.powersUsed, t => statsData.powersUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Abilities Used", VanillaSprites.ChallengesIcon, 0,
-                () => statsData.abilitiesUsed, t => statsData.abilitiesUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Coop Cash Given", VanillaSprites.CoOpIcon, 0,
-                () => (int)statsData.coopCashGiven, t => statsData.coopCashGiven = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Damage Done To Bosses", VanillaSprites.BADIcon, 0,
-                () => (int)statsData.damageDoneToBosses, t => statsData.damageDoneToBosses = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Transforming Tonics Used", VanillaSprites.AlchemistIcon, 0,
-                () => statsData.transformingTonicsUsed, t => statsData.transformingTonicsUsed = t));
-            Settings["Player Stats"].Add(new NumberPlayerDataSetting("Necro Bloons Reanimated", VanillaSprites.WizardIcon, 0,
-                () => (int)statsData.necroBloonsReanimated, t => statsData.necroBloonsReanimated = t));
-        }
     }
 
-    private static dynamic? GetPlayerStats()
-    {
-        try
-        {
-            var playerType = GetPlayer().GetType();
-            var statsProperty = playerType.GetProperty("Stats", BindingFlags.Public | BindingFlags.Instance);
-            if (statsProperty != null)
-            {
-                return statsProperty.GetValue(GetPlayer());
-            }
-        }
-        catch (Exception ex)
-        {
-            ModHelper.Warning<EditPlayerData>($"Could not get player stats: {ex.Message}");
-        }
-        return null;
-    }
-
-    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
-
-    private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
-
-    private static TMP_InputField? _searchInput;
-    private string _searchValue = "";
-    private string _category = "General";
-    private int _pageIdx;
-
-    private ModHelperPanel? _topArea;  // Dodano nullable
-
-    private static Btd6Player GetPlayer()
-    {
-        return Game.Player;
-    }
+    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue)) / EntriesPerPage;
 
     public override bool OnMenuOpened(Object data)
     {
@@ -514,6 +431,63 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         
         _topArea.AddPanel(new Info("Spacing", InfoPreset.Flex));
         
+        // =================== NOWE PRZYCISKI START ===================
+        var utilitiesPanel = _topArea.AddPanel(new Info("UtilitiesPanel", 0, 0), 
+            layoutAxis: RectTransform.Axis.Horizontal, spacing: 50);
+        
+        utilitiesPanel.AddButton(new Info("SetAllPowers", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
+        {
+            var value = ModHelperInput.ShowInputInt("Set All Powers", "Enter quantity for all powers:", 0);
+            if (value.HasValue)
+            {
+                foreach (var setting in Settings["Powers"].OfType<NumberPlayerDataSetting>())
+                {
+                    setting.SetValue(value.Value);
+                }
+                UpdateVisibleEntries();
+            }
+        })).AddText("Set All Powers", 50);
+
+        utilitiesPanel.AddButton(new Info("SetAllInstas", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
+        {
+            var value = ModHelperInput.ShowInputInt("Set All Instas", "Enter quantity for all instas:", 0);
+            if (value.HasValue)
+            {
+                foreach (var setting in Settings["Instas"].OfType<InstaMonkeyPlayerDataSetting>())
+                {
+                    setting.SetQuantity(value.Value);
+                }
+                UpdateVisibleEntries();
+            }
+        })).AddText("Set All Instas", 50);
+
+        utilitiesPanel.AddButton(new Info("AddAllXP", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
+        {
+            var value = ModHelperInput.ShowInputInt("Add XP", "Enter XP to add to all towers:", 0);
+            if (value.HasValue)
+            {
+                foreach (var setting in Settings["Tower XP"].OfType<TowerPlayerDataSetting>())
+                {
+                    setting.SetValue(setting.GetValue() + value.Value);
+                }
+                UpdateVisibleEntries();
+            }
+        })).AddText("Add XP to All", 50);
+
+        utilitiesPanel.AddButton(new Info("UnlockUpgrades", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
+        {
+            foreach (var setting in Settings["Tower XP"])
+            {
+                if (setting is TowerPlayerDataSetting towerSetting)
+                {
+                    towerSetting.Unlock();
+                    towerSetting.SetValue(9999999);
+                }
+            }
+            UpdateVisibleEntries();
+        })).AddText("Unlock All Upgrades", 50);
+        // =================== NOWE PRZYCISKI KONIEC ===================
+
         _topArea.AddButton(new Info("UnlockAll", 650, 200), VanillaSprites.GreenBtnLong, new Action(() =>
         {
             Settings[_category].ForEach(s=>s.Unlock());
@@ -521,11 +495,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         })).AddText(new Info("UnlockAllText", 650, 200), "Unlock All", 60);
         _topArea.AddPanel(new Info("UnlockAll Filler", 650, 200));       
 
-        
         GenerateEntries();
         SetPage(0);
 
-        // for no discernible reason, this defaults to 300
         GameMenu.scrollRect.scrollSensitivity = 50;
         
         return false;
@@ -534,7 +506,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     public override void OnMenuClosed()
     {
         _isOpen = false;
-        
         Game.Player.SaveNow();
         _category = "General";
     }
@@ -554,14 +525,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        if (_topArea != null)  // Dodano null check
-        {
-            _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
-            _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
-        }
-
-        // Add special action buttons
-        AddSpecialActionButtons();
+        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
@@ -584,112 +549,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 entry.SetSetting(settings[idx]);
                 entry.SetActive(true);
             }
-        }
-    }
-
-    private void AddSpecialActionButtons()
-    {
-        // Remove existing special buttons first
-        if (_topArea != null)
-        {
-            var specialButton = _topArea.GetDescendent<ModHelperButton>("SpecialActionButton");
-            if (specialButton != null)
-            {
-                specialButton.gameObject.Destroy();
-            }
-        }
-
-        if (_category == "Tower XP" && _topArea != null)
-        {
-            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
-                VanillaSprites.GreenBtnLong, new Action(() =>
-            {
-                // Use two separate popups for min and max values
-                PopupScreen.instance.ShowSetValuePopup("Set Minimum XP", 
-                    "Enter minimum XP value", 
-                    new Action<int>(min =>
-                    {
-                        PopupScreen.instance.ShowSetValuePopup("Set Maximum XP", 
-                            "Enter maximum XP value", 
-                            new Action<int>(max =>
-                            {
-                                if (max > min)
-                                {
-                                    var rng = new Random();
-                                    foreach (var tower in Game.instance.GetTowerDetailModels())
-                                    {
-                                        var xp = rng.Next(min, max + 1);
-                                        var data = GetPlayer().Data;
-                                        if (!data.towerXp.ContainsKey(tower.towerId))
-                                        {
-                                            data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
-                                        }
-                                        else
-                                        {
-                                            data.towerXp[tower.towerId].Value = xp;
-                                        }
-                                    }
-                                    UpdateVisibleEntries();
-                                }
-                            }), 5000000);
-                    }), 1000000);
-            }));
-            button.AddText(new Info("UnlockAllText", 650, 200), "Set XP Range", 50);
-        }
-        else if (_category == "Powers" && _topArea != null)
-        {
-            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
-                VanillaSprites.GreenBtnLong, new Action(() =>
-            {
-                PopupScreen.instance.ShowSetValuePopup("Set All Powers", 
-                    "Enter value to set for all powers", 
-                    new Action<int>(value =>
-                    {
-                        foreach (var power in Game.instance.model.powers)
-                        {
-                            if (power.name is "CaveMonkey" or "DungeonStatue" or "SpookyCreature") continue;
-                            
-                            if (GetPlayer().IsPowerAvailable(power.name))
-                            {
-                                GetPlayer().GetPowerData(power.name).Quantity = value;
-                            }
-                            else
-                            {
-                                GetPlayer().AddPower(power.name, value);
-                            }
-                        }
-                        UpdateVisibleEntries();
-                    }), 400);
-            }));
-            button.AddText(new Info("UnlockAllText", 650, 200), "Set All Powers", 50);
-        }
-        else if ((_category == "Maps" || _category == "Maps - Coop") && _topArea != null)
-        {
-            var button = _topArea.AddButton(new Info("SpecialActionButton", 650, 200) { X = 1500 }, 
-                VanillaSprites.GreenBtnLong, new Action(() =>
-            {
-                var coop = _category == "Maps - Coop";
-                var maps = GameData.Instance.mapSet.StandardMaps.ToArray().ToList();
-                var rng = new Random();
-                var selectedMap = maps[rng.Next(maps.Count)];
-                
-                PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, 
-                    "Random Map Medals", 
-                    $"Select medals for: {LocalizationManager.Instance.Format(selectedMap.id)}", 
-                    new Action(() =>
-                    {
-                        // Apply the same medal configuration to random map
-                        var mapInfo = GetPlayer().Data.mapInfo.GetMap(selectedMap.id);
-                        if (!GetPlayer().Data.mapInfo.IsMapUnlocked(selectedMap.id))
-                        {
-                            GetPlayer().Data.mapInfo.UnlockMap(selectedMap.id);
-                        }
-                        
-                        UpdateVisibleEntries();
-                    }), "OK", new Action(() => {}), "Cancel", 
-                    Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
-            }));
-            button.AddText(new Info("UnlockAllText", 650, 200), "Random Medals", 50);
         }
     }
 
@@ -717,7 +576,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     }
     
     [HarmonyPatch(typeof(TMP_InputField), nameof(TMP_InputField.KeyPressed))]
-    // ReSharper disable once InconsistentNaming
     internal class TMP_InputField_KeyPressed
     {
         [HarmonyPrefix]
@@ -729,4 +587,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         }
     }
+    
+    private static Btd6Player GetPlayer() => Game.Player;
 }
