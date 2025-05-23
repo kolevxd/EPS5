@@ -102,36 +102,31 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         },
         {
-            "Trophy Store", new List<PlayerDataSetting>()             
+            "Trophy Store", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values             
         },
         {
-            "Maps", new List<PlayerDataSetting>()
+            "Maps", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Maps - Coop", new List<PlayerDataSetting>()
+            "Maps - Coop", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Tower XP", new List<PlayerDataSetting>()
+            "Tower XP", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Powers", new List<PlayerDataSetting>()
+            "Powers", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Instas", new List<PlayerDataSetting>()
+            "Instas", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Online Modes", new List<PlayerDataSetting>()
+            "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         }
     };
 
     private static bool _isOpen;
+
     private const int EntriesPerPage = 5;
-    private static TMP_InputField? _searchInput;
-    private string _searchValue = "";
-    private string _category = "General";
-    private int _pageIdx;
-    private ModHelperPanel _topArea;
-    private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
 
     public static void InitSettings(ProfileModel data)
     {
@@ -154,6 +149,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 () => Game.Player.AddTrophyStoreItem(item.id)));
         }
 
+        
         foreach (var details in GameData.Instance.mapSet.StandardMaps.ToIl2CppList())
         {
             Settings["Maps"].Add(new MapPlayerDataSetting(details, data.mapInfo.GetMap(details.id), false)
@@ -378,6 +374,22 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
     }
 
+    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
+
+    private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
+
+    private static TMP_InputField? _searchInput;
+    private string _searchValue = "";
+    private string _category = "General";
+    private int _pageIdx;
+
+    private ModHelperPanel _topArea;
+
+    private static Btd6Player GetPlayer()
+    {
+        return Game.Player;
+    }
+
     public override bool OnMenuOpened(Object data)
     {
         _isOpen = true;
@@ -429,63 +441,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         
         _topArea.AddPanel(new Info("Spacing", InfoPreset.Flex));
         
-        // =================== NOWE PRZYCISKI START ===================
-        var utilitiesPanel = _topArea.AddPanel(new Info("UtilitiesPanel", 0, 0), 
-            layoutAxis: RectTransform.Axis.Horizontal, spacing: 50);
-        
-        utilitiesPanel.AddButton(new Info("SetAllPowers", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
-        {
-            var value = ModHelperInput.ShowInputInt("Set All Powers", "Enter quantity for all powers:", 0);
-            if (value.HasValue)
-            {
-                foreach (var setting in Settings["Powers"].OfType<NumberPlayerDataSetting>())
-                {
-                    setting.SetValue(value.Value);
-                }
-                UpdateVisibleEntries();
-            }
-        })).AddText("Set All Powers", 50);
-
-        utilitiesPanel.AddButton(new Info("SetAllInstas", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
-        {
-            var value = ModHelperInput.ShowInputInt("Set All Instas", "Enter quantity for all instas:", 0);
-            if (value.HasValue)
-            {
-                foreach (var setting in Settings["Instas"].OfType<InstaMonkeyPlayerDataSetting>())
-                {
-                    setting.SetQuantity(value.Value);
-                }
-                UpdateVisibleEntries();
-            }
-        })).AddText("Set All Instas", 50);
-
-        utilitiesPanel.AddButton(new Info("AddAllXP", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
-        {
-            var value = ModHelperInput.ShowInputInt("Add XP", "Enter XP to add to all towers:", 0);
-            if (value.HasValue)
-            {
-                foreach (var setting in Settings["Tower XP"].OfType<TowerPlayerDataSetting>())
-                {
-                    setting.SetValue(setting.GetValue() + value.Value);
-                }
-                UpdateVisibleEntries();
-            }
-        })).AddText("Add XP to All", 50);
-
-        utilitiesPanel.AddButton(new Info("UnlockUpgrades", 400, 200), VanillaSprites.GreenBtnLong, new Action(() =>
-        {
-            foreach (var setting in Settings["Tower XP"])
-            {
-                if (setting is TowerPlayerDataSetting towerSetting)
-                {
-                    towerSetting.Unlock();
-                    towerSetting.SetValue(9999999);
-                }
-            }
-            UpdateVisibleEntries();
-        })).AddText("Unlock All Upgrades", 50);
-        // =================== NOWE PRZYCISKI KONIEC ===================
-
         _topArea.AddButton(new Info("UnlockAll", 650, 200), VanillaSprites.GreenBtnLong, new Action(() =>
         {
             Settings[_category].ForEach(s=>s.Unlock());
@@ -493,9 +448,11 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         })).AddText(new Info("UnlockAllText", 650, 200), "Unlock All", 60);
         _topArea.AddPanel(new Info("UnlockAll Filler", 650, 200));       
 
+        
         GenerateEntries();
         SetPage(0);
 
+        // for no discernible reason, this defaults to 300
         GameMenu.scrollRect.scrollSensitivity = 50;
         
         return false;
@@ -504,6 +461,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     public override void OnMenuClosed()
     {
         _isOpen = false;
+        
         Game.Player.SaveNow();
         _category = "General";
     }
@@ -574,6 +532,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     }
     
     [HarmonyPatch(typeof(TMP_InputField), nameof(TMP_InputField.KeyPressed))]
+    // ReSharper disable once InconsistentNaming
     internal class TMP_InputField_KeyPressed
     {
         [HarmonyPrefix]
@@ -585,6 +544,4 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         }
     }
-    
-    private static Btd6Player GetPlayer() => Game.Player;
 }
