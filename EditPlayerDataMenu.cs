@@ -104,28 +104,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         },
         {
-            "Trophy Store", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values             
+            "Trophy Store", new List<PlayerDataSetting>()
         },
         {
-            "Maps", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Maps", new List<PlayerDataSetting>()
         },
         {
-            "Maps - Coop", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Maps - Coop", new List<PlayerDataSetting>()
         },
         {
-            "Tower XP", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Tower XP", new List<PlayerDataSetting>()
         },
         {
-            "Powers", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Powers", new List<PlayerDataSetting>()
         },
         {
-            "Instas", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Instas", new List<PlayerDataSetting>()
         },
         {
-            "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+            "Online Modes", new List<PlayerDataSetting>()
         },
         {
-            "Prefix", new List<PlayerDataSetting>() // New category for prefix system
+            "Prefix", new List<PlayerDataSetting>()
         }
     };
 
@@ -161,7 +161,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         public static int PlayerLevelValue = 155;
         
         public static bool ApplyMedals = true;
-        public static int MedalsPercentage = 75; // What percentage of medals to give based on level
+        public static int MedalsPercentage = 75;
         
         public static Random random = new Random();
     }
@@ -178,7 +178,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Prefix"].Clear();
         
         // Initialize Prefix settings
-        InitializePrefixSettings();
+        Settings["Prefix"].Add(new PrefixSettingDisplay());
         
         foreach (var item in GameData.Instance.trophyStoreItems.GetAllItems())
         {
@@ -416,13 +416,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
     }
 
-    private static void InitializePrefixSettings()
-    {
-        // This will be the custom UI for Prefix settings
-        Settings["Prefix"].Add(new PrefixSettingDisplay());
-    }
-
-    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
+    private int LastPage => Math.Max(0, (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage);
 
     private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
 
@@ -534,18 +528,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             _topArea!.GetDescendent<ModHelperButton>("UnlockAll").SetActive(false);
             _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(true);
             
-            // Hide all entries except the first one
+            // Clear all entries first
             for (var i = 0; i < EntriesPerPage; i++)
             {
-                _entries[i].SetActive(i == 0);
+                _entries[i].SetActive(false);
             }
             
             // Show the prefix UI in the first entry
             if (Settings["Prefix"].Count > 0 && Settings["Prefix"][0] is PrefixSettingDisplay prefixSetting)
             {
+                _entries[0].SetActive(true);
                 _entries[0].transform.DestroyAllChildren();
+                _entries[0].RectTransform.sizeDelta = new Vector2(0, 2000); // Make it bigger for the content
                 prefixSetting.CreatePrefixUI(_entries[0]);
             }
+            
+            // Hide pagination for prefix
+            GameMenu.firstPageBtn.interactable = false;
+            GameMenu.previousPageBtn.interactable = false;
+            GameMenu.lastPageBtn.interactable = false;
+            GameMenu.nextPageBtn.interactable = false;
+            GameMenu.SetCurrentPage(1);
+            GameMenu.totalPages = 1;
             
             return;
         }
@@ -635,13 +639,32 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         public override void ResetToDefault()
         {
             // Reset all prefix settings to default
+            PrefixSettings.MonkeyMoney = true;
+            PrefixSettings.MonkeyMoneyMin = 500000;
+            PrefixSettings.MonkeyMoneyMax = 550000;
+            PrefixSettings.Powers = true;
+            PrefixSettings.PowersAmount = 400;
+            PrefixSettings.InstaMonkeys = true;
+            PrefixSettings.InstaMonkeysAmount = 100;
+            PrefixSettings.UnlockAllTowers = true;
+            PrefixSettings.TowerXP = true;
+            PrefixSettings.TowerXPMin = 450000;
+            PrefixSettings.TowerXPMax = 550000;
+            PrefixSettings.DoubleCash = true;
+            PrefixSettings.FastTrack = true;
+            PrefixSettings.RogueLegends = true;
+            PrefixSettings.MapEditor = true;
+            PrefixSettings.PlayerLevel = true;
+            PrefixSettings.PlayerLevelValue = 155;
+            PrefixSettings.ApplyMedals = true;
+            PrefixSettings.MedalsPercentage = 75;
         }
 
         public void CreatePrefixUI(ModHelperPanel parent)
         {
             parent.transform.DestroyAllChildren();
             
-            var scrollPanel = parent.AddScrollPanel(new Info("PrefixScroll", InfoPreset.FillParent), 
+            var scrollPanel = parent.AddScrollPanel(new Info("PrefixScroll", 0, 0, 1950, 1800), 
                 RectTransform.Axis.Vertical, VanillaSprites.MainBGPanelBlue, 50, 50);
             
             var content = scrollPanel.ScrollContent;
@@ -934,9 +957,20 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                         }
                         
                         // Race medals
-                        player.Data.raceMedalData[4] = new KonFuze_NoShuffle(raceMedals); // DoubleGold
-                        player.Data.raceMedalData[5] = new KonFuze_NoShuffle(raceMedals / 2); // GoldSilver
-                        player.Data.raceMedalData[8] = new KonFuze_NoShuffle(raceMedals / 4); // Bronze
+                        if (!player.Data.raceMedalData.ContainsKey(4))
+                            player.Data.raceMedalData[4] = new KonFuze_NoShuffle(raceMedals); // DoubleGold
+                        else
+                            player.Data.raceMedalData[4].Value = raceMedals;
+                            
+                        if (!player.Data.raceMedalData.ContainsKey(5))
+                            player.Data.raceMedalData[5] = new KonFuze_NoShuffle(raceMedals / 2); // GoldSilver
+                        else
+                            player.Data.raceMedalData[5].Value = raceMedals / 2;
+                            
+                        if (!player.Data.raceMedalData.ContainsKey(8))
+                            player.Data.raceMedalData[8] = new KonFuze_NoShuffle(raceMedals / 4); // Bronze
+                        else
+                            player.Data.raceMedalData[8].Value = raceMedals / 4;
                     }
                     
                     Game.Player.SaveNow();
