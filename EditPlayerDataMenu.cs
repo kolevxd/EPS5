@@ -431,7 +431,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel _topArea;
+    private ModHelperPanel? _topArea;
 
     private static Btd6Player GetPlayer()
     {
@@ -531,7 +531,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         // Special handling for Prefix category
         if (_category == "Prefix")
         {
-            _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(false);
+            _topArea!.GetDescendent<ModHelperButton>("UnlockAll").SetActive(false);
             _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(true);
             
             // Hide all entries except the first one
@@ -551,7 +551,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
         
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+        _topArea!.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
         _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
@@ -849,9 +849,9 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             }
                             
                             // Unlock all upgrades for this tower
-                            foreach (var upgrade in model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
-                                .Concat(model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
-                                .Concat(model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades))
+                            foreach (var upgrade in Game.instance.model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
+                                .Concat(Game.instance.model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
+                                .Concat(Game.instance.model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades))
                             {
                                 if (!player.HasUpgrade(upgrade))
                                 {
@@ -941,7 +941,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     
                     Game.Player.SaveNow();
                     
-                    PopupScreen.instance.ShowOkPopup("Success!", "Preset applied successfully!");
+                    PopupScreen.instance.ShowOkPopup("Success!");
                 }),
                 "Yes", new Action(() => {}), "Cancel", Popup.TransitionAnim.Scale);
         }
