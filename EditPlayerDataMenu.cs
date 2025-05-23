@@ -18,6 +18,7 @@ using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
 using Il2CppAssets.Scripts.Unity.UI_New.Achievements;
 using Il2CppAssets.Scripts.Unity.UI_New.ChallengeEditor;
+using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNinjaKiwi.Common;
 using Il2CppSystem.Linq;
@@ -27,6 +28,7 @@ using UnityEngine.UI;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
+using Random = System.Random;
 
 namespace EditPlayerData.UI;
 
@@ -121,12 +123,48 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         },
         {
             "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
+        },
+        {
+            "Prefix", new List<PlayerDataSetting>() // New category for prefix system
         }
     };
 
     private static bool _isOpen;
 
     private const int EntriesPerPage = 5;
+
+    // Prefix system variables
+    private static class PrefixSettings
+    {
+        public static bool MonkeyMoney = true;
+        public static int MonkeyMoneyMin = 500000;
+        public static int MonkeyMoneyMax = 550000;
+        
+        public static bool Powers = true;
+        public static int PowersAmount = 400;
+        
+        public static bool InstaMonkeys = true;
+        public static int InstaMonkeysAmount = 100;
+        
+        public static bool UnlockAllTowers = true;
+        
+        public static bool TowerXP = true;
+        public static int TowerXPMin = 450000;
+        public static int TowerXPMax = 550000;
+        
+        public static bool DoubleCash = true;
+        public static bool FastTrack = true;
+        public static bool RogueLegends = true;
+        public static bool MapEditor = true;
+        
+        public static bool PlayerLevel = true;
+        public static int PlayerLevelValue = 155;
+        
+        public static bool ApplyMedals = true;
+        public static int MedalsPercentage = 75; // What percentage of medals to give based on level
+        
+        public static Random random = new Random();
+    }
 
     public static void InitSettings(ProfileModel data)
     {
@@ -137,6 +175,10 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Powers"].Clear();
         Settings["Instas"].Clear();
         Settings["Online Modes"].Clear();
+        Settings["Prefix"].Clear();
+        
+        // Initialize Prefix settings
+        InitializePrefixSettings();
         
         foreach (var item in GameData.Instance.trophyStoreItems.GetAllItems())
         {
@@ -374,6 +416,12 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
     }
 
+    private static void InitializePrefixSettings()
+    {
+        // This will be the custom UI for Prefix settings
+        Settings["Prefix"].Add(new PrefixSettingDisplay());
+    }
+
     private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
 
     private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
@@ -480,6 +528,28 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
 
     private void UpdateVisibleEntries()
     {
+        // Special handling for Prefix category
+        if (_category == "Prefix")
+        {
+            _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(false);
+            _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(true);
+            
+            // Hide all entries except the first one
+            for (var i = 0; i < EntriesPerPage; i++)
+            {
+                _entries[i].SetActive(i == 0);
+            }
+            
+            // Show the prefix UI in the first entry
+            if (Settings["Prefix"].Count > 0 && Settings["Prefix"][0] is PrefixSettingDisplay prefixSetting)
+            {
+                _entries[0].transform.DestroyAllChildren();
+                prefixSetting.CreatePrefixUI(_entries[0]);
+            }
+            
+            return;
+        }
+        
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
         _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
         _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
@@ -542,6 +612,338 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             {
                 evt.character = (char) 0;                
             }
+        }
+    }
+    
+    // Custom Prefix Setting Display
+    public class PrefixSettingDisplay : PlayerDataSetting
+    {
+        public PrefixSettingDisplay() : base("Quick Preset System", VanillaSprites.SettingsIcon)
+        {
+        }
+
+        protected override ModHelperComponent GetValue()
+        {
+            return ModHelperText.Create(new Info("Text", InfoPreset.FillParent), "Configure and apply presets", 60);
+        }
+
+        protected override void ShowEditValuePopup(PopupScreen screen)
+        {
+            // Not used for prefix
+        }
+
+        public override void ResetToDefault()
+        {
+            // Reset all prefix settings to default
+        }
+
+        public void CreatePrefixUI(ModHelperPanel parent)
+        {
+            parent.transform.DestroyAllChildren();
+            
+            var scrollPanel = parent.AddScrollPanel(new Info("PrefixScroll", InfoPreset.FillParent), 
+                RectTransform.Axis.Vertical, VanillaSprites.MainBGPanelBlue, 50, 50);
+            
+            var content = scrollPanel.ScrollContent;
+            
+            // Title
+            content.AddText(new Info("Title", 1800, 120), "Quick Preset Configuration", 100)
+                .Text.alignment = TextAlignmentOptions.Center;
+            
+            // Monkey Money
+            var moneyPanel = content.AddPanel(new Info("MoneyPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            var moneyCheckbox = moneyPanel.AddCheckbox(new Info("MoneyCheck", 100), 
+                PrefixSettings.MonkeyMoney, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.MonkeyMoney = b));
+            moneyPanel.AddText(new Info("MoneyLabel", 400), "Monkey Money:", 60);
+            var moneyMin = moneyPanel.AddInputField(new Info("MoneyMin", 300, 100), 
+                PrefixSettings.MonkeyMoneyMin.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MonkeyMoneyMin = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            moneyPanel.AddText(new Info("ToDash", 100), " - ", 50);
+            var moneyMax = moneyPanel.AddInputField(new Info("MoneyMax", 300, 100), 
+                PrefixSettings.MonkeyMoneyMax.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MonkeyMoneyMax = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            
+            // Powers
+            var powersPanel = content.AddPanel(new Info("PowersPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            powersPanel.AddCheckbox(new Info("PowersCheck", 100), 
+                PrefixSettings.Powers, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.Powers = b));
+            powersPanel.AddText(new Info("PowersLabel", 400), "Powers Amount:", 60);
+            powersPanel.AddInputField(new Info("PowersAmount", 300, 100), 
+                PrefixSettings.PowersAmount.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.PowersAmount = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            
+            // Insta Monkeys
+            var instaPanel = content.AddPanel(new Info("InstaPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            instaPanel.AddCheckbox(new Info("InstaCheck", 100), 
+                PrefixSettings.InstaMonkeys, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.InstaMonkeys = b));
+            instaPanel.AddText(new Info("InstaLabel", 400), "Insta Monkeys:", 60);
+            instaPanel.AddInputField(new Info("InstaAmount", 300, 100), 
+                PrefixSettings.InstaMonkeysAmount.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.InstaMonkeysAmount = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            
+            // Tower XP
+            var xpPanel = content.AddPanel(new Info("XPPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            xpPanel.AddCheckbox(new Info("XPCheck", 100), 
+                PrefixSettings.TowerXP, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.TowerXP = b));
+            xpPanel.AddText(new Info("XPLabel", 400), "Tower XP:", 60);
+            xpPanel.AddInputField(new Info("XPMin", 300, 100), 
+                PrefixSettings.TowerXPMin.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.TowerXPMin = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            xpPanel.AddText(new Info("ToDash2", 100), " - ", 50);
+            xpPanel.AddInputField(new Info("XPMax", 300, 100), 
+                PrefixSettings.TowerXPMax.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.TowerXPMax = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            
+            // Unlock All Towers
+            var unlockPanel = content.AddPanel(new Info("UnlockPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            unlockPanel.AddCheckbox(new Info("UnlockCheck", 100), 
+                PrefixSettings.UnlockAllTowers, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.UnlockAllTowers = b));
+            unlockPanel.AddText(new Info("UnlockLabel", 600), "Unlock All Towers", 60);
+            
+            // Player Level
+            var levelPanel = content.AddPanel(new Info("LevelPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            levelPanel.AddCheckbox(new Info("LevelCheck", 100), 
+                PrefixSettings.PlayerLevel, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.PlayerLevel = b));
+            levelPanel.AddText(new Info("LevelLabel", 400), "Player Level:", 60);
+            levelPanel.AddInputField(new Info("LevelValue", 300, 100), 
+                PrefixSettings.PlayerLevelValue.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.PlayerLevelValue = v; }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            
+            // Premium Features Header
+            content.AddText(new Info("PremiumHeader", 1800, 100), "Premium Features", 80)
+                .Text.alignment = TextAlignmentOptions.Center;
+            
+            // Double Cash
+            var doubleCashPanel = content.AddPanel(new Info("DoubleCashPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            doubleCashPanel.AddCheckbox(new Info("DoubleCashCheck", 100), 
+                PrefixSettings.DoubleCash, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.DoubleCash = b));
+            doubleCashPanel.AddText(new Info("DoubleCashLabel", 600), "Double Cash Mode", 60);
+            
+            // Fast Track
+            var fastTrackPanel = content.AddPanel(new Info("FastTrackPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            fastTrackPanel.AddCheckbox(new Info("FastTrackCheck", 100), 
+                PrefixSettings.FastTrack, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.FastTrack = b));
+            fastTrackPanel.AddText(new Info("FastTrackLabel", 600), "Fast Track Mode", 60);
+            
+            // Rogue Legends
+            var roguePanel = content.AddPanel(new Info("RoguePanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            roguePanel.AddCheckbox(new Info("RogueCheck", 100), 
+                PrefixSettings.RogueLegends, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.RogueLegends = b));
+            roguePanel.AddText(new Info("RogueLabel", 600), "Rogue Legends", 60);
+            
+            // Map Editor
+            var mapEditorPanel = content.AddPanel(new Info("MapEditorPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            mapEditorPanel.AddCheckbox(new Info("MapEditorCheck", 100), 
+                PrefixSettings.MapEditor, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.MapEditor = b));
+            mapEditorPanel.AddText(new Info("MapEditorLabel", 600), "Map Editor", 60);
+            
+            // Medals
+            var medalsPanel = content.AddPanel(new Info("MedalsPanel", 1800, 150), 
+                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
+            medalsPanel.AddCheckbox(new Info("MedalsCheck", 100), 
+                PrefixSettings.ApplyMedals, VanillaSprites.SmallSquareDarkInner,
+                new Action<bool>(b => PrefixSettings.ApplyMedals = b));
+            medalsPanel.AddText(new Info("MedalsLabel", 600), "Apply Medals (% based on level):", 60);
+            medalsPanel.AddInputField(new Info("MedalsPercent", 200, 100), 
+                PrefixSettings.MedalsPercentage.ToString(), VanillaSprites.BlueInsertPanelRound,
+                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MedalsPercentage = Math.Clamp(v, 0, 100); }),
+                50, TMP_InputField.CharacterValidation.Integer);
+            medalsPanel.AddText(new Info("PercentSign", 50), "%", 50);
+            
+            // Apply Button
+            content.AddButton(new Info("ApplyButton", 800, 200), VanillaSprites.GreenBtnLong,
+                new Action(() => ApplyPreset())).AddText(new Info("ApplyText"), "Apply Preset", 80);
+        }
+        
+        private void ApplyPreset()
+        {
+            PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, "Apply Preset?",
+                "This will apply all selected settings. Are you sure?",
+                new Action(() =>
+                {
+                    var player = GetPlayer();
+                    
+                    // Monkey Money
+                    if (PrefixSettings.MonkeyMoney)
+                    {
+                        var amount = PrefixSettings.random.Next(PrefixSettings.MonkeyMoneyMin, PrefixSettings.MonkeyMoneyMax + 1);
+                        player.Data.monkeyMoney.Value = amount;
+                    }
+                    
+                    // Powers
+                    if (PrefixSettings.Powers)
+                    {
+                        foreach (var power in Game.instance.model.powers)
+                        {
+                            if (power.name is "CaveMonkey" or "DungeonStatue" or "SpookyCreature") continue;
+                            
+                            if (player.IsPowerAvailable(power.name))
+                            {
+                                player.GetPowerData(power.name).Quantity = PrefixSettings.PowersAmount;
+                            }
+                            else
+                            {
+                                player.AddPower(power.name, PrefixSettings.PowersAmount);
+                            }
+                        }
+                    }
+                    
+                    // Unlock All Towers
+                    if (PrefixSettings.UnlockAllTowers)
+                    {
+                        foreach (var tower in Game.instance.GetTowerDetailModels())
+                        {
+                            if (!player.Data.unlockedTowers.Contains(tower.towerId))
+                            {
+                                Game.instance.towerGoalUnlockManager.CompleteGoalForTower(tower.towerId);
+                                player.Data.UnlockTower(tower.towerId);
+                            }
+                        }
+                    }
+                    
+                    // Tower XP
+                    if (PrefixSettings.TowerXP)
+                    {
+                        var towers = Game.instance.GetTowerDetailModels().ToList();
+                        foreach (var tower in towers)
+                        {
+                            var xp = PrefixSettings.random.Next(PrefixSettings.TowerXPMin, PrefixSettings.TowerXPMax + 1);
+                            // Add some variation between towers
+                            xp += PrefixSettings.random.Next(-5000, 5001);
+                            xp = Math.Max(0, xp);
+                            
+                            if (!player.Data.towerXp.ContainsKey(tower.towerId))
+                            {
+                                player.Data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
+                            }
+                            else
+                            {
+                                player.Data.towerXp[tower.towerId].Value = xp;
+                            }
+                            
+                            // Unlock all upgrades for this tower
+                            foreach (var upgrade in model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
+                                .Concat(model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
+                                .Concat(model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades))
+                            {
+                                if (!player.HasUpgrade(upgrade))
+                                {
+                                    player.Data.acquiredUpgrades.Add(upgrade);
+                                }
+                            }
+                            
+                            var paragon = Game.instance.model.GetParagonUpgradeForTowerId(tower.towerId);
+                            if (paragon != null && !player.HasUpgrade(paragon.name))
+                            {
+                                player.Data.acquiredUpgrades.Add(paragon.name);
+                            }
+                        }
+                    }
+                    
+                    // Insta Monkeys
+                    if (PrefixSettings.InstaMonkeys)
+                    {
+                        foreach (var tower in Game.instance.GetTowerDetailModels())
+                        {
+                            // Add 000 instas
+                            player.GetInstaTower(tower.towerId, new[] {0, 0, 0}).Quantity += PrefixSettings.InstaMonkeysAmount;
+                        }
+                    }
+                    
+                    // Player Level
+                    if (PrefixSettings.PlayerLevel)
+                    {
+                        player.Data.seenVeteranRankInfo = true;
+                        var rankInfo = GameData.Instance.rankInfo;
+                        var rank = Math.Min(PrefixSettings.PlayerLevelValue, rankInfo.GetMaxRank());
+                        var veteranRank = Math.Max(PrefixSettings.PlayerLevelValue - rankInfo.GetMaxRank(), 0);
+                        
+                        player.Data.rank.Value = rank;
+                        player.Data.veteranRank.Value = rank == rankInfo.GetMaxRank() ? veteranRank + 1 : 0;
+                        player.Data.xp.Value = rankInfo.GetRankInfo(rank-1).totalXpNeeded;
+                        player.Data.veteranXp.Value = (long) veteranRank * rankInfo.xpNeededPerVeteranRank;
+                    }
+                    
+                    // Premium Features
+                    if (PrefixSettings.DoubleCash)
+                    {
+                        player.Data.purchase.AddOneTimePurchaseItem("btd6_doublecashmode");
+                    }
+                    
+                    if (PrefixSettings.FastTrack)
+                    {
+                        player.Data.unlockedFastTrack = true;
+                    }
+                    
+                    if (PrefixSettings.RogueLegends)
+                    {
+                        player.Data.purchase.AddOneTimePurchaseItem("btd6_legendsrogue");
+                    }
+                    
+                    if (PrefixSettings.MapEditor)
+                    {
+                        player.Data.purchase.AddOneTimePurchaseItem("btd6_mapeditorsupporter_new");
+                    }
+                    
+                    // Medals based on level
+                    if (PrefixSettings.ApplyMedals && PrefixSettings.PlayerLevel)
+                    {
+                        var medalCount = (int)(PrefixSettings.PlayerLevelValue * PrefixSettings.MedalsPercentage / 100.0);
+                        
+                        // Distribute medals across different types
+                        var bossMedals = medalCount / 6;
+                        var raceMedals = medalCount / 8;
+                        var ctMedals = medalCount / 10;
+                        
+                        // Boss medals
+                        foreach (var boss in Enum.GetValues<BossType>())
+                        {
+                            if (!player.Data.bossMedals.ContainsKey((int)boss))
+                            {
+                                player.Data.bossMedals[(int)boss] = new BossMedalSaveData();
+                            }
+                            player.Data.bossMedals[(int)boss].normalBadges.Value = Math.Max(1, bossMedals);
+                            player.Data.bossMedals[(int)boss].eliteBadges.Value = Math.Max(1, bossMedals / 2);
+                        }
+                        
+                        // Race medals
+                        player.Data.raceMedalData[4] = new KonFuze_NoShuffle(raceMedals); // DoubleGold
+                        player.Data.raceMedalData[5] = new KonFuze_NoShuffle(raceMedals / 2); // GoldSilver
+                        player.Data.raceMedalData[8] = new KonFuze_NoShuffle(raceMedals / 4); // Bronze
+                    }
+                    
+                    Game.Player.SaveNow();
+                    
+                    PopupScreen.instance.ShowOkPopup("Success!", "Preset applied successfully!");
+                }),
+                "Yes", new Action(() => {}), "Cancel", Popup.TransitionAnim.Scale);
         }
     }
 }
