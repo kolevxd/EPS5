@@ -28,7 +28,6 @@ using UnityEngine.UI;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
-using Random = System.Random;
 
 namespace EditPlayerData.UI;
 
@@ -104,67 +103,31 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             }
         },
         {
-            "Trophy Store", new List<PlayerDataSetting>()
+            "Trophy Store", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values             
         },
         {
-            "Maps", new List<PlayerDataSetting>()
+            "Maps", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Maps - Coop", new List<PlayerDataSetting>()
+            "Maps - Coop", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Tower XP", new List<PlayerDataSetting>()
+            "Tower XP", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Powers", new List<PlayerDataSetting>()
+            "Powers", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Instas", new List<PlayerDataSetting>()
+            "Instas", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         },
         {
-            "Online Modes", new List<PlayerDataSetting>()
-        },
-        {
-            "Prefix", new List<PlayerDataSetting>()
+            "Online Modes", new List<PlayerDataSetting>() // uses a loop to reduce hard-coded values
         }
     };
 
     private static bool _isOpen;
 
     private const int EntriesPerPage = 5;
-
-    // Prefix system variables
-    private static class PrefixSettings
-    {
-        public static bool MonkeyMoney = true;
-        public static int MonkeyMoneyMin = 500000;
-        public static int MonkeyMoneyMax = 550000;
-        
-        public static bool Powers = true;
-        public static int PowersAmount = 400;
-        
-        public static bool InstaMonkeys = true;
-        public static int InstaMonkeysAmount = 100;
-        
-        public static bool UnlockAllTowers = true;
-        
-        public static bool TowerXP = true;
-        public static int TowerXPMin = 450000;
-        public static int TowerXPMax = 550000;
-        
-        public static bool DoubleCash = true;
-        public static bool FastTrack = true;
-        public static bool RogueLegends = true;
-        public static bool MapEditor = true;
-        
-        public static bool PlayerLevel = true;
-        public static int PlayerLevelValue = 155;
-        
-        public static bool ApplyMedals = true;
-        public static int MedalsPercentage = 75;
-        
-        public static Random random = new Random();
-    }
 
     public static void InitSettings(ProfileModel data)
     {
@@ -175,10 +138,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         Settings["Powers"].Clear();
         Settings["Instas"].Clear();
         Settings["Online Modes"].Clear();
-        Settings["Prefix"].Clear();
-        
-        // Initialize Prefix settings
-        Settings["Prefix"].Add(new PrefixSettingDisplay());
         
         foreach (var item in GameData.Instance.trophyStoreItems.GetAllItems())
         {
@@ -416,7 +375,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         }
     }
 
-    private int LastPage => Math.Max(0, (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage);
+    private int LastPage => (Settings[_category].Count(s => s.Name.ContainsIgnoreCase(_searchValue))-1) / EntriesPerPage;
 
     private readonly PlayerDataSettingDisplay[] _entries = new PlayerDataSettingDisplay[EntriesPerPage];
 
@@ -425,7 +384,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel? _topArea;
+    private ModHelperPanel _topArea;
+    private ModHelperPanel _bulkActionsPanel;
 
     private static Btd6Player GetPlayer()
     {
@@ -468,6 +428,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             {
                 _category = Settings.Keys.ElementAt(i);
                 SetPage(0);
+                UpdateBulkActions();
             }), VanillaSprites.BlueInsertPanelRound, 80f);
         _topArea.AddPanel(new Info("Spacing", InfoPreset.Flex));
         _searchInput = _topArea.AddInputField(new Info("Search", 1500, 150), _searchValue,
@@ -490,6 +451,15 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         })).AddText(new Info("UnlockAllText", 650, 200), "Unlock All", 60);
         _topArea.AddPanel(new Info("UnlockAll Filler", 650, 200));       
 
+        // Add bulk actions panel
+        _bulkActionsPanel = GameMenu.GetComponentFromChildrenByName<RectTransform>("Container").gameObject
+            .AddModHelperPanel(new Info("BulkActionsPanel")
+            {
+                Y = -550, Height = 200, Pivot = new Vector2(0.5f, 1),
+                AnchorMin = new Vector2(0, 1), AnchorMax = new Vector2(1, 1)
+            }, layoutAxis: RectTransform.Axis.Horizontal, padding: 50, spacing: 50);
+        
+        UpdateBulkActions();
         
         GenerateEntries();
         SetPage(0);
@@ -498,6 +468,424 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         GameMenu.scrollRect.scrollSensitivity = 50;
         
         return false;
+    }
+
+    private void UpdateBulkActions()
+    {
+        _bulkActionsPanel.transform.DestroyAllChildren();
+        
+        if (_category == "Powers")
+        {
+            _bulkActionsPanel.AddButton(new Info("SetAllPowers", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Set All Powers", "Set all powers to this value:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Powers"])
+                        {
+                            if (setting is NumberPlayerDataSetting numSetting)
+                            {
+                                numSetting.ResetToDefault();
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                setter?.Invoke(value);
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 0);
+            })).AddText(new Info("SetAllPowersText"), "Set All Powers", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("AddToPowers", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Add to Powers", "Add this amount to all powers:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Powers"])
+                        {
+                            if (setting is NumberPlayerDataSetting numSetting)
+                            {
+                                var getter = numSetting.GetType().GetField("Getter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Func<int>;
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                if (getter != null && setter != null)
+                                {
+                                    setter.Invoke(getter.Invoke() + value);
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 10);
+            })).AddText(new Info("AddToPowersText"), "Add to All", 50);
+        }
+        else if (_category == "Maps" || _category == "Maps - Coop")
+        {
+            _bulkActionsPanel.AddButton(new Info("CompleteAllMaps", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                var popup = PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, "Complete All Maps", 
+                    "Configure map completion settings",
+                    new Action(() =>
+                    {
+                        var difficulty = popup.GetComponentInChildren<ModHelperDropdown>().Dropdown.value;
+                        var winCount = int.Parse(popup.GetComponentsInChildren<ModHelperInputField>()[0].CurrentValue);
+                        var noExit = popup.GetComponentInChildren<ModHelperCheckbox>().CurrentValue;
+                        
+                        foreach (var setting in Settings[_category])
+                        {
+                            if (setting is MapPlayerDataSetting mapSetting)
+                            {
+                                mapSetting.Unlock();
+                                
+                                var map = Game.Player.Data.mapInfo.GetMap(mapSetting.GetType()
+                                    .GetField("_details", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                                    .GetValue(mapSetting).Cast<MapDetails>().id);
+                                
+                                var difficulties = difficulty == 0 ? new[] { "Easy", "Medium", "Hard" } : 
+                                    difficulty == 1 ? new[] { "Easy" } :
+                                    difficulty == 2 ? new[] { "Medium" } : new[] { "Hard" };
+                                
+                                foreach (var diff in difficulties)
+                                {
+                                    var modes = MapPlayerDataSetting.Difficulties[diff];
+                                    foreach (var mode in modes)
+                                    {
+                                        var mapMode = map.GetOrCreateDifficulty(diff).GetOrCreateMode(mode, _category == "Maps - Coop");
+                                        mapMode.timesCompleted = winCount;
+                                        mapMode.completedWithoutLoadingSave = noExit;
+                                    }
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), "Ok", null, "Cancel",
+                    Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
+                
+                var popupBody = popup.WaitForCompletion().FindObject("Body");
+                
+                var panel = popupBody.AddModHelperPanel(new Info("Panel", 1000, 400), layoutAxis: RectTransform.Axis.Vertical, spacing: 25);
+                panel.AddDropdown(new Info("Difficulty", 800, 125),
+                    new Il2CppSystem.Collections.Generic.List<string> { "All", "Easy", "Medium", "Hard" }, 400,
+                    null, VanillaSprites.BlueInsertPanelRound, 50);
+                panel.AddInputField(new Info("WinCount", 800, 125), "1",
+                    VanillaSprites.BlueInsertPanelRound, null, 50, TMP_InputField.CharacterValidation.Digit,
+                    TextAlignmentOptions.Center, "Win Count");
+                panel.AddCheckbox(new Info("NoExit", 800, 125), true,
+                    VanillaSprites.BlueInsertPanelRound, null).AddText(new Info("NoExitText"), "Complete Without Exit", 50);
+            })).AddText(new Info("CompleteAllMapsText"), "Complete All Maps", 45);
+            
+            _bulkActionsPanel.AddButton(new Info("ResetAllMaps", 450, 150), VanillaSprites.RedBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, "Reset All Maps?", 
+                    "This will reset all map progress. Are you sure?",
+                    new Action(() =>
+                    {
+                        foreach (var setting in Settings[_category])
+                        {
+                            setting.ResetToDefault();
+                        }
+                        UpdateVisibleEntries();
+                    }), "Yes", null, "No",
+                    Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
+            })).AddText(new Info("ResetAllMapsText"), "Reset All Maps", 45);
+        }
+        else if (_category == "Tower XP")
+        {
+            _bulkActionsPanel.AddButton(new Info("MaxAllTowers", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                foreach (var setting in Settings["Tower XP"])
+                {
+                    setting.Unlock();
+                    if (setting is TowerPlayerDataSetting towerSetting)
+                    {
+                        var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(towerSetting) as Action<int>;
+                        setter?.Invoke(999999999);
+                    }
+                }
+                UpdateVisibleEntries();
+            })).AddText(new Info("MaxAllTowersText"), "Max All Towers", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("UnlockAllUpgrades", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
+            {
+                foreach (var tower in Game.instance.GetTowerDetailModels())
+                {
+                    if (!GetPlayer().Data.unlockedTowers.Contains(tower.towerId))
+                    {
+                        GetPlayer().Data.UnlockTower(tower.towerId);
+                    }
+                    
+                    var model = Game.instance.model;
+                    foreach (var upgrade in model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
+                        .Concat(model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
+                        .Concat(model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades))
+                    {
+                        if (!GetPlayer().HasUpgrade(upgrade))
+                        {
+                            GetPlayer().Data.acquiredUpgrades.Add(upgrade);
+                        }
+                    }
+                    
+                    var paragon = Game.instance.model.GetParagonUpgradeForTowerId(tower.towerId);
+                    if (paragon != null && !GetPlayer().HasUpgrade(paragon.name))
+                    {
+                        GetPlayer().Data.acquiredUpgrades.Add(paragon.name);
+                    }
+                }
+                UpdateVisibleEntries();
+            })).AddText(new Info("UnlockAllUpgradesText"), "Unlock All Upgrades", 45);
+        }
+        else if (_category == "Instas")
+        {
+            _bulkActionsPanel.AddButton(new Info("AddAllInstas", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Add Instas", "Add this many of each tier to all towers:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Instas"])
+                        {
+                            if (setting is InstaMonkeyPlayerDataSetting instaSetting)
+                            {
+                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(instaSetting) as TowerDetailsModel;
+                                
+                                var tierSet = new HashSet<int[]>(new TowerTiersEqualityComparer());
+                                for (var mainPath = 0; mainPath < 3; mainPath++)
+                                {
+                                    for (var mainPathTier = 0; mainPathTier <= 5; mainPathTier++)
+                                    {
+                                        for (var crossPath = 0; crossPath < 3; crossPath++)
+                                        {
+                                            for (var crossPathTier = 0; crossPathTier <= 2; crossPathTier++)
+                                            {
+                                                var tiers = new[] { 0, 0, 0 };
+                                                tiers[crossPath] = crossPathTier;
+                                                tiers[mainPath] = mainPathTier;
+                                                tierSet.Add(tiers);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                foreach (var tiers in tierSet)
+                                {
+                                    GetPlayer().GetInstaTower(tower.towerId, tiers).Quantity += value;
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 1);
+            })).AddText(new Info("AddAllInstasText"), "Add All Instas", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("FillCollections", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowOkPopup("Fill Collections", "This will add any missing insta monkeys to complete all collections. Continue?",
+                    new Action(() =>
+                    {
+                        foreach (var setting in Settings["Instas"])
+                        {
+                            if (setting is InstaMonkeyPlayerDataSetting instaSetting)
+                            {
+                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(instaSetting) as TowerDetailsModel;
+                                
+                                var tierSet = new HashSet<int[]>(new TowerTiersEqualityComparer());
+                                for (var mainPath = 0; mainPath < 3; mainPath++)
+                                {
+                                    for (var mainPathTier = 0; mainPathTier <= 5; mainPathTier++)
+                                    {
+                                        for (var crossPath = 0; crossPath < 3; crossPath++)
+                                        {
+                                            for (var crossPathTier = 0; crossPathTier <= 2; crossPathTier++)
+                                            {
+                                                var tiers = new[] { 0, 0, 0 };
+                                                tiers[crossPath] = crossPathTier;
+                                                tiers[mainPath] = mainPathTier;
+                                                tierSet.Add(tiers);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                foreach (var tiers in tierSet)
+                                {
+                                    var insta = GetPlayer().GetInstaTower(tower.towerId, tiers);
+                                    if (insta.Quantity == 0)
+                                    {
+                                        insta.Quantity = 1;
+                                    }
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }));
+            })).AddText(new Info("FillCollectionsText"), "Fill Collections", 50);
+        }
+        else if (_category == "Online Modes")
+        {
+            _bulkActionsPanel.AddButton(new Info("SetAllBosses", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Set All Boss Medals", "Set all boss medals to:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Online Modes"])
+                        {
+                            if (setting.Name.Contains("Boss") && !setting.Name.Contains("Elite") && !setting.Name.Contains("st"))
+                            {
+                                if (setting is NumberPlayerDataSetting numSetting)
+                                {
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    setter?.Invoke(value);
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 0);
+            })).AddText(new Info("SetAllBossesText"), "Set Boss Medals", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("SetAllElites", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Set All Elite Boss Medals", "Set all elite boss medals to:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Online Modes"])
+                        {
+                            if (setting.Name.Contains("Elite") && setting.Name.Contains("Boss") && !setting.Name.Contains("st"))
+                            {
+                                if (setting is NumberPlayerDataSetting numSetting)
+                                {
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    setter?.Invoke(value);
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 0);
+            })).AddText(new Info("SetAllElitesText"), "Set Elite Medals", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("SetAllRaces", 450, 150), VanillaSprites.YellowBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowSetValuePopup("Set All Race Medals", "Set all race medals to:",
+                    new Action<int>(value =>
+                    {
+                        foreach (var setting in Settings["Online Modes"])
+                        {
+                            if (setting.Name.Contains("Race"))
+                            {
+                                if (setting is NumberPlayerDataSetting numSetting)
+                                {
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    setter?.Invoke(value);
+                                }
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }), 0);
+            })).AddText(new Info("SetAllRacesText"), "Set Race Medals", 50);
+        }
+        else if (_category == "General")
+        {
+            _bulkActionsPanel.AddButton(new Info("UnlockEverything", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowOkPopup("Unlock Everything", "This will unlock all content. Continue?",
+                    new Action(() =>
+                    {
+                        foreach (var categorySettings in Settings.Values)
+                        {
+                            foreach (var setting in categorySettings)
+                            {
+                                setting.Unlock();
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }));
+            })).AddText(new Info("UnlockEverythingText"), "Unlock Everything", 45);
+            
+            _bulkActionsPanel.AddButton(new Info("MaxAccount", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowOkPopup("Max Account", "This will max out your account progress. Continue?",
+                    new Action(() =>
+                    {
+                        GetPlayer().Data.monkeyMoney.Value = 999999999;
+                        GetPlayer().Data.knowledgePoints.Value = 999;
+                        GetPlayer().Data.trophies.Value = 999999;
+                        GetPlayer().Data.rank.Value = 155;
+                        GetPlayer().Data.veteranRank.Value = 100;
+                        GetPlayer().Data.xp.Value = GameData.Instance.rankInfo.GetRankInfo(154).totalXpNeeded;
+                        GetPlayer().Data.veteranXp.Value = 99L * GameData.Instance.rankInfo.xpNeededPerVeteranRank;
+                        
+                        foreach (var categorySettings in Settings.Values)
+                        {
+                            foreach (var setting in categorySettings)
+                            {
+                                setting.Unlock();
+                            }
+                        }
+                        UpdateVisibleEntries();
+                    }));
+            })).AddText(new Info("MaxAccountText"), "Max Account", 50);
+            
+            _bulkActionsPanel.AddButton(new Info("Completionist", 450, 150), VanillaSprites.YellowBtnLong, new Action(() =>
+            {
+                PopupScreen.instance.ShowOkPopup("Completionist Mode", "This will 100% complete the game. Continue?",
+                    new Action(() =>
+                    {
+                        // Max general stats
+                        GetPlayer().Data.monkeyMoney.Value = 999999999;
+                        GetPlayer().Data.knowledgePoints.Value = 999;
+                        GetPlayer().Data.trophies.Value = 999999;
+                        GetPlayer().Data.rank.Value = 155;
+                        GetPlayer().Data.veteranRank.Value = 100;
+                        
+                        // Complete all maps
+                        foreach (var setting in Settings["Maps"].Concat(Settings["Maps - Coop"]))
+                        {
+                            if (setting is MapPlayerDataSetting mapSetting)
+                            {
+                                mapSetting.Unlock();
+                                var map = Game.Player.Data.mapInfo.GetMap(mapSetting.GetType()
+                                    .GetField("_details", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                                    .GetValue(mapSetting).Cast<MapDetails>().id);
+                                
+                                foreach (var difficulty in new[] { "Easy", "Medium", "Hard" })
+                                {
+                                    foreach (var mode in MapPlayerDataSetting.Difficulties[difficulty])
+                                    {
+                                        var mapMode = map.GetOrCreateDifficulty(difficulty).GetOrCreateMode(mode, setting.Name.Contains("Coop"));
+                                        mapMode.timesCompleted = 1;
+                                        mapMode.completedWithoutLoadingSave = true;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Max all towers
+                        foreach (var setting in Settings["Tower XP"])
+                        {
+                            setting.Unlock();
+                            if (setting is TowerPlayerDataSetting towerSetting)
+                            {
+                                var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(towerSetting) as Action<int>;
+                                setter?.Invoke(999999999);
+                            }
+                        }
+                        
+                        // Unlock everything else
+                        foreach (var categorySettings in Settings.Values)
+                        {
+                            foreach (var setting in categorySettings)
+                            {
+                                setting.Unlock();
+                            }
+                        }
+                        
+                        UpdateVisibleEntries();
+                    }));
+            })).AddText(new Info("CompletionistText"), "Completionist", 50);
+        }
+        
+        // Adjust scroll rect position if bulk actions panel is shown
+        if (_bulkActionsPanel.transform.childCount > 0)
+        {
+            GameMenu.scrollRect.rectTransform.localPosition = new Vector3(0, 200, 0);
+        }
+        else
+        {
+            GameMenu.scrollRect.rectTransform.localPosition = new Vector3(0, 100, 0);
+        }
     }
 
     public override void OnMenuClosed()
@@ -522,40 +910,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
 
     private void UpdateVisibleEntries()
     {
-        // Special handling for Prefix category
-        if (_category == "Prefix")
-        {
-            _topArea!.GetDescendent<ModHelperButton>("UnlockAll").SetActive(false);
-            _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(true);
-            
-            // Clear all entries first
-            for (var i = 0; i < EntriesPerPage; i++)
-            {
-                _entries[i].SetActive(false);
-            }
-            
-            // Show the prefix UI in the first entry
-            if (Settings["Prefix"].Count > 0 && Settings["Prefix"][0] is PrefixSettingDisplay prefixSetting)
-            {
-                _entries[0].SetActive(true);
-                _entries[0].transform.DestroyAllChildren();
-                _entries[0].RectTransform.sizeDelta = new Vector2(0, 2000); // Make it bigger for the content
-                prefixSetting.CreatePrefixUI(_entries[0]);
-            }
-            
-            // Hide pagination for prefix
-            GameMenu.firstPageBtn.interactable = false;
-            GameMenu.previousPageBtn.interactable = false;
-            GameMenu.lastPageBtn.interactable = false;
-            GameMenu.nextPageBtn.interactable = false;
-            GameMenu.SetCurrentPage(1);
-            GameMenu.totalPages = 1;
-            
-            return;
-        }
-        
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea!.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
         _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
@@ -616,368 +972,6 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
             {
                 evt.character = (char) 0;                
             }
-        }
-    }
-    
-    // Custom Prefix Setting Display
-    public class PrefixSettingDisplay : PlayerDataSetting
-    {
-        public PrefixSettingDisplay() : base("Quick Preset System", VanillaSprites.SettingsIcon)
-        {
-        }
-
-        protected override ModHelperComponent GetValue()
-        {
-            return ModHelperText.Create(new Info("Text", InfoPreset.FillParent), "Configure and apply presets", 60);
-        }
-
-        protected override void ShowEditValuePopup(PopupScreen screen)
-        {
-            // Not used for prefix
-        }
-
-        public override void ResetToDefault()
-        {
-            // Reset all prefix settings to default
-            PrefixSettings.MonkeyMoney = true;
-            PrefixSettings.MonkeyMoneyMin = 500000;
-            PrefixSettings.MonkeyMoneyMax = 550000;
-            PrefixSettings.Powers = true;
-            PrefixSettings.PowersAmount = 400;
-            PrefixSettings.InstaMonkeys = true;
-            PrefixSettings.InstaMonkeysAmount = 100;
-            PrefixSettings.UnlockAllTowers = true;
-            PrefixSettings.TowerXP = true;
-            PrefixSettings.TowerXPMin = 450000;
-            PrefixSettings.TowerXPMax = 550000;
-            PrefixSettings.DoubleCash = true;
-            PrefixSettings.FastTrack = true;
-            PrefixSettings.RogueLegends = true;
-            PrefixSettings.MapEditor = true;
-            PrefixSettings.PlayerLevel = true;
-            PrefixSettings.PlayerLevelValue = 155;
-            PrefixSettings.ApplyMedals = true;
-            PrefixSettings.MedalsPercentage = 75;
-        }
-
-        public void CreatePrefixUI(ModHelperPanel parent)
-        {
-            parent.transform.DestroyAllChildren();
-            
-            var scrollPanel = parent.AddScrollPanel(new Info("PrefixScroll", 0, 0, 1950, 1800), 
-                RectTransform.Axis.Vertical, VanillaSprites.MainBGPanelBlue, 50, 50);
-            
-            var content = scrollPanel.ScrollContent;
-            
-            // Title
-            content.AddText(new Info("Title", 1800, 120), "Quick Preset Configuration", 100)
-                .Text.alignment = TextAlignmentOptions.Center;
-            
-            // Monkey Money
-            var moneyPanel = content.AddPanel(new Info("MoneyPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            var moneyCheckbox = moneyPanel.AddCheckbox(new Info("MoneyCheck", 100), 
-                PrefixSettings.MonkeyMoney, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.MonkeyMoney = b));
-            moneyPanel.AddText(new Info("MoneyLabel", 400), "Monkey Money:", 60);
-            var moneyMin = moneyPanel.AddInputField(new Info("MoneyMin", 300, 100), 
-                PrefixSettings.MonkeyMoneyMin.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MonkeyMoneyMin = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            moneyPanel.AddText(new Info("ToDash", 100), " - ", 50);
-            var moneyMax = moneyPanel.AddInputField(new Info("MoneyMax", 300, 100), 
-                PrefixSettings.MonkeyMoneyMax.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MonkeyMoneyMax = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            
-            // Powers
-            var powersPanel = content.AddPanel(new Info("PowersPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            powersPanel.AddCheckbox(new Info("PowersCheck", 100), 
-                PrefixSettings.Powers, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.Powers = b));
-            powersPanel.AddText(new Info("PowersLabel", 400), "Powers Amount:", 60);
-            powersPanel.AddInputField(new Info("PowersAmount", 300, 100), 
-                PrefixSettings.PowersAmount.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.PowersAmount = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            
-            // Insta Monkeys
-            var instaPanel = content.AddPanel(new Info("InstaPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            instaPanel.AddCheckbox(new Info("InstaCheck", 100), 
-                PrefixSettings.InstaMonkeys, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.InstaMonkeys = b));
-            instaPanel.AddText(new Info("InstaLabel", 400), "Insta Monkeys:", 60);
-            instaPanel.AddInputField(new Info("InstaAmount", 300, 100), 
-                PrefixSettings.InstaMonkeysAmount.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.InstaMonkeysAmount = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            
-            // Tower XP
-            var xpPanel = content.AddPanel(new Info("XPPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            xpPanel.AddCheckbox(new Info("XPCheck", 100), 
-                PrefixSettings.TowerXP, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.TowerXP = b));
-            xpPanel.AddText(new Info("XPLabel", 400), "Tower XP:", 60);
-            xpPanel.AddInputField(new Info("XPMin", 300, 100), 
-                PrefixSettings.TowerXPMin.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.TowerXPMin = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            xpPanel.AddText(new Info("ToDash2", 100), " - ", 50);
-            xpPanel.AddInputField(new Info("XPMax", 300, 100), 
-                PrefixSettings.TowerXPMax.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.TowerXPMax = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            
-            // Unlock All Towers
-            var unlockPanel = content.AddPanel(new Info("UnlockPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            unlockPanel.AddCheckbox(new Info("UnlockCheck", 100), 
-                PrefixSettings.UnlockAllTowers, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.UnlockAllTowers = b));
-            unlockPanel.AddText(new Info("UnlockLabel", 600), "Unlock All Towers", 60);
-            
-            // Player Level
-            var levelPanel = content.AddPanel(new Info("LevelPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            levelPanel.AddCheckbox(new Info("LevelCheck", 100), 
-                PrefixSettings.PlayerLevel, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.PlayerLevel = b));
-            levelPanel.AddText(new Info("LevelLabel", 400), "Player Level:", 60);
-            levelPanel.AddInputField(new Info("LevelValue", 300, 100), 
-                PrefixSettings.PlayerLevelValue.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.PlayerLevelValue = v; }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            
-            // Premium Features Header
-            content.AddText(new Info("PremiumHeader", 1800, 100), "Premium Features", 80)
-                .Text.alignment = TextAlignmentOptions.Center;
-            
-            // Double Cash
-            var doubleCashPanel = content.AddPanel(new Info("DoubleCashPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            doubleCashPanel.AddCheckbox(new Info("DoubleCashCheck", 100), 
-                PrefixSettings.DoubleCash, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.DoubleCash = b));
-            doubleCashPanel.AddText(new Info("DoubleCashLabel", 600), "Double Cash Mode", 60);
-            
-            // Fast Track
-            var fastTrackPanel = content.AddPanel(new Info("FastTrackPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            fastTrackPanel.AddCheckbox(new Info("FastTrackCheck", 100), 
-                PrefixSettings.FastTrack, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.FastTrack = b));
-            fastTrackPanel.AddText(new Info("FastTrackLabel", 600), "Fast Track Mode", 60);
-            
-            // Rogue Legends
-            var roguePanel = content.AddPanel(new Info("RoguePanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            roguePanel.AddCheckbox(new Info("RogueCheck", 100), 
-                PrefixSettings.RogueLegends, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.RogueLegends = b));
-            roguePanel.AddText(new Info("RogueLabel", 600), "Rogue Legends", 60);
-            
-            // Map Editor
-            var mapEditorPanel = content.AddPanel(new Info("MapEditorPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            mapEditorPanel.AddCheckbox(new Info("MapEditorCheck", 100), 
-                PrefixSettings.MapEditor, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.MapEditor = b));
-            mapEditorPanel.AddText(new Info("MapEditorLabel", 600), "Map Editor", 60);
-            
-            // Medals
-            var medalsPanel = content.AddPanel(new Info("MedalsPanel", 1800, 150), 
-                VanillaSprites.MainBgPanelWhiteSmall, RectTransform.Axis.Horizontal, 25);
-            medalsPanel.AddCheckbox(new Info("MedalsCheck", 100), 
-                PrefixSettings.ApplyMedals, VanillaSprites.SmallSquareDarkInner,
-                new Action<bool>(b => PrefixSettings.ApplyMedals = b));
-            medalsPanel.AddText(new Info("MedalsLabel", 600), "Apply Medals (% based on level):", 60);
-            medalsPanel.AddInputField(new Info("MedalsPercent", 200, 100), 
-                PrefixSettings.MedalsPercentage.ToString(), VanillaSprites.BlueInsertPanelRound,
-                new Action<string>(s => { if (int.TryParse(s, out var v)) PrefixSettings.MedalsPercentage = Math.Clamp(v, 0, 100); }),
-                50, TMP_InputField.CharacterValidation.Integer);
-            medalsPanel.AddText(new Info("PercentSign", 50), "%", 50);
-            
-            // Apply Button
-            content.AddButton(new Info("ApplyButton", 800, 200), VanillaSprites.GreenBtnLong,
-                new Action(() => ApplyPreset())).AddText(new Info("ApplyText"), "Apply Preset", 80);
-        }
-        
-        private void ApplyPreset()
-        {
-            PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, "Apply Preset?",
-                "This will apply all selected settings. Are you sure?",
-                new Action(() =>
-                {
-                    var player = GetPlayer();
-                    
-                    // Monkey Money
-                    if (PrefixSettings.MonkeyMoney)
-                    {
-                        var amount = PrefixSettings.random.Next(PrefixSettings.MonkeyMoneyMin, PrefixSettings.MonkeyMoneyMax + 1);
-                        player.Data.monkeyMoney.Value = amount;
-                    }
-                    
-                    // Powers
-                    if (PrefixSettings.Powers)
-                    {
-                        foreach (var power in Game.instance.model.powers)
-                        {
-                            if (power.name is "CaveMonkey" or "DungeonStatue" or "SpookyCreature") continue;
-                            
-                            if (player.IsPowerAvailable(power.name))
-                            {
-                                player.GetPowerData(power.name).Quantity = PrefixSettings.PowersAmount;
-                            }
-                            else
-                            {
-                                player.AddPower(power.name, PrefixSettings.PowersAmount);
-                            }
-                        }
-                    }
-                    
-                    // Unlock All Towers
-                    if (PrefixSettings.UnlockAllTowers)
-                    {
-                        foreach (var tower in Game.instance.GetTowerDetailModels())
-                        {
-                            if (!player.Data.unlockedTowers.Contains(tower.towerId))
-                            {
-                                Game.instance.towerGoalUnlockManager.CompleteGoalForTower(tower.towerId);
-                                player.Data.UnlockTower(tower.towerId);
-                            }
-                        }
-                    }
-                    
-                    // Tower XP
-                    if (PrefixSettings.TowerXP)
-                    {
-                        var towers = Game.instance.GetTowerDetailModels().ToList();
-                        foreach (var tower in towers)
-                        {
-                            var xp = PrefixSettings.random.Next(PrefixSettings.TowerXPMin, PrefixSettings.TowerXPMax + 1);
-                            // Add some variation between towers
-                            xp += PrefixSettings.random.Next(-5000, 5001);
-                            xp = Math.Max(0, xp);
-                            
-                            if (!player.Data.towerXp.ContainsKey(tower.towerId))
-                            {
-                                player.Data.towerXp[tower.towerId] = new KonFuze_NoShuffle(xp);
-                            }
-                            else
-                            {
-                                player.Data.towerXp[tower.towerId].Value = xp;
-                            }
-                            
-                            // Unlock all upgrades for this tower
-                            foreach (var upgrade in Game.instance.model.GetTower(tower.towerId, pathOneTier: 5).appliedUpgrades
-                                .Concat(Game.instance.model.GetTower(tower.towerId, pathTwoTier: 5).appliedUpgrades)
-                                .Concat(Game.instance.model.GetTower(tower.towerId, pathThreeTier: 5).appliedUpgrades))
-                            {
-                                if (!player.HasUpgrade(upgrade))
-                                {
-                                    player.Data.acquiredUpgrades.Add(upgrade);
-                                }
-                            }
-                            
-                            var paragon = Game.instance.model.GetParagonUpgradeForTowerId(tower.towerId);
-                            if (paragon != null && !player.HasUpgrade(paragon.name))
-                            {
-                                player.Data.acquiredUpgrades.Add(paragon.name);
-                            }
-                        }
-                    }
-                    
-                    // Insta Monkeys
-                    if (PrefixSettings.InstaMonkeys)
-                    {
-                        foreach (var tower in Game.instance.GetTowerDetailModels())
-                        {
-                            // Add 000 instas
-                            player.GetInstaTower(tower.towerId, new[] {0, 0, 0}).Quantity += PrefixSettings.InstaMonkeysAmount;
-                        }
-                    }
-                    
-                    // Player Level
-                    if (PrefixSettings.PlayerLevel)
-                    {
-                        player.Data.seenVeteranRankInfo = true;
-                        var rankInfo = GameData.Instance.rankInfo;
-                        var rank = Math.Min(PrefixSettings.PlayerLevelValue, rankInfo.GetMaxRank());
-                        var veteranRank = Math.Max(PrefixSettings.PlayerLevelValue - rankInfo.GetMaxRank(), 0);
-                        
-                        player.Data.rank.Value = rank;
-                        player.Data.veteranRank.Value = rank == rankInfo.GetMaxRank() ? veteranRank + 1 : 0;
-                        player.Data.xp.Value = rankInfo.GetRankInfo(rank-1).totalXpNeeded;
-                        player.Data.veteranXp.Value = (long) veteranRank * rankInfo.xpNeededPerVeteranRank;
-                    }
-                    
-                    // Premium Features
-                    if (PrefixSettings.DoubleCash)
-                    {
-                        player.Data.purchase.AddOneTimePurchaseItem("btd6_doublecashmode");
-                    }
-                    
-                    if (PrefixSettings.FastTrack)
-                    {
-                        player.Data.unlockedFastTrack = true;
-                    }
-                    
-                    if (PrefixSettings.RogueLegends)
-                    {
-                        player.Data.purchase.AddOneTimePurchaseItem("btd6_legendsrogue");
-                    }
-                    
-                    if (PrefixSettings.MapEditor)
-                    {
-                        player.Data.purchase.AddOneTimePurchaseItem("btd6_mapeditorsupporter_new");
-                    }
-                    
-                    // Medals based on level
-                    if (PrefixSettings.ApplyMedals && PrefixSettings.PlayerLevel)
-                    {
-                        var medalCount = (int)(PrefixSettings.PlayerLevelValue * PrefixSettings.MedalsPercentage / 100.0);
-                        
-                        // Distribute medals across different types
-                        var bossMedals = medalCount / 6;
-                        var raceMedals = medalCount / 8;
-                        var ctMedals = medalCount / 10;
-                        
-                        // Boss medals
-                        foreach (var boss in Enum.GetValues<BossType>())
-                        {
-                            if (!player.Data.bossMedals.ContainsKey((int)boss))
-                            {
-                                player.Data.bossMedals[(int)boss] = new BossMedalSaveData();
-                            }
-                            player.Data.bossMedals[(int)boss].normalBadges.Value = Math.Max(1, bossMedals);
-                            player.Data.bossMedals[(int)boss].eliteBadges.Value = Math.Max(1, bossMedals / 2);
-                        }
-                        
-                        // Race medals
-                        if (!player.Data.raceMedalData.ContainsKey(4))
-                            player.Data.raceMedalData[4] = new KonFuze_NoShuffle(raceMedals); // DoubleGold
-                        else
-                            player.Data.raceMedalData[4].Value = raceMedals;
-                            
-                        if (!player.Data.raceMedalData.ContainsKey(5))
-                            player.Data.raceMedalData[5] = new KonFuze_NoShuffle(raceMedals / 2); // GoldSilver
-                        else
-                            player.Data.raceMedalData[5].Value = raceMedals / 2;
-                            
-                        if (!player.Data.raceMedalData.ContainsKey(8))
-                            player.Data.raceMedalData[8] = new KonFuze_NoShuffle(raceMedals / 4); // Bronze
-                        else
-                            player.Data.raceMedalData[8].Value = raceMedals / 4;
-                    }
-                    
-                    Game.Player.SaveNow();
-                    
-                    PopupScreen.instance.ShowOkPopup("Success!");
-                }),
-                "Yes", new Action(() => {}), "Cancel", Popup.TransitionAnim.Scale);
         }
     }
 }
