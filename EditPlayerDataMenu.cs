@@ -11,8 +11,10 @@ using Il2Cpp;
 using Il2CppAssets.Scripts.Data;
 using Il2CppAssets.Scripts.Data.Boss;
 using Il2CppAssets.Scripts.Data.TrophyStore;
+using Il2CppAssets.Scripts.Data.MapSets;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Models.Store.Loot;
+using Il2CppAssets.Scripts.Models.TowerSets;
 using Il2CppAssets.Scripts.Unity;
 using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.Player;
@@ -25,6 +27,7 @@ using Il2CppSystem.Linq;
 using Il2CppTMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using EditPlayerData.Utils;
 using Action = System.Action;
 using Enum = System.Enum;
 using Object = Il2CppSystem.Object;
@@ -486,12 +489,12 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             if (setting is NumberPlayerDataSetting numSetting)
                             {
                                 numSetting.ResetToDefault();
-                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
                                 setter?.Invoke(value);
                             }
                         }
                         UpdateVisibleEntries();
-                    }), 0);
+                    }), 400);
             })).AddText(new Info("SetAllPowersText"), "Set All Powers", 50);
             
             _bulkActionsPanel.AddButton(new Info("AddToPowers", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
@@ -503,8 +506,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                         {
                             if (setting is NumberPlayerDataSetting numSetting)
                             {
-                                var getter = numSetting.GetType().GetField("Getter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Func<int>;
-                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                var getter = numSetting.GetType().GetField("Getter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Func<int>;
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
                                 if (getter != null && setter != null)
                                 {
                                     setter.Invoke(getter.Invoke() + value);
@@ -519,13 +522,14 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         {
             _bulkActionsPanel.AddButton(new Info("CompleteAllMaps", 450, 150), VanillaSprites.GreenBtnLong, new Action(() =>
             {
+                PopupScreen screen = null!;
                 var popup = PopupScreen.instance.ShowPopup(PopupScreen.Placement.inGameCenter, "Complete All Maps", 
                     "Configure map completion settings",
                     new Action(() =>
                     {
-                        var difficulty = popup.GetComponentInChildren<ModHelperDropdown>().Dropdown.value;
-                        var winCount = int.Parse(popup.GetComponentsInChildren<ModHelperInputField>()[0].CurrentValue);
-                        var noExit = popup.GetComponentInChildren<ModHelperCheckbox>().CurrentValue;
+                        var difficulty = screen.GetComponentInChildren<ModHelperDropdown>().Dropdown.value;
+                        var winCount = int.Parse(screen.GetComponentsInChildren<ModHelperInputField>()[0].CurrentValue);
+                        var noExit = screen.GetComponentInChildren<ModHelperCheckbox>().CurrentValue;
                         
                         foreach (var setting in Settings[_category])
                         {
@@ -533,9 +537,10 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             {
                                 mapSetting.Unlock();
                                 
-                                var map = Game.Player.Data.mapInfo.GetMap(mapSetting.GetType()
+                                var map = Game.Player.Data.mapInfo.GetMap((mapSetting.GetType()
                                     .GetField("_details", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                                    .GetValue(mapSetting).Cast<MapDetails>().id);
+                                    ?.GetValue(mapSetting) as MapDetails)?.id ?? "");
+                                if (map == null) continue;
                                 
                                 var difficulties = difficulty == 0 ? new[] { "Easy", "Medium", "Hard" } : 
                                     difficulty == 1 ? new[] { "Easy" } :
@@ -557,11 +562,12 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     }), "Ok", null, "Cancel",
                     Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey);
                 
-                var popupBody = popup.WaitForCompletion().FindObject("Body");
+                screen = popup.WaitForCompletion();
+                var popupBody = screen.FindObject("Body");
                 
                 var panel = popupBody.AddModHelperPanel(new Info("Panel", 1000, 400), layoutAxis: RectTransform.Axis.Vertical, spacing: 25);
                 panel.AddDropdown(new Info("Difficulty", 800, 125),
-                    new Il2CppSystem.Collections.Generic.List<string> { "All", "Easy", "Medium", "Hard" }, 400,
+                    new[] { "All", "Easy", "Medium", "Hard" }.ToIl2CppList(), 400,
                     null, VanillaSprites.BlueInsertPanelRound, 50);
                 panel.AddInputField(new Info("WinCount", 800, 125), "1",
                     VanillaSprites.BlueInsertPanelRound, null, 50, TMP_InputField.CharacterValidation.Digit,
@@ -594,7 +600,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     setting.Unlock();
                     if (setting is TowerPlayerDataSetting towerSetting)
                     {
-                        var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(towerSetting) as Action<int>;
+                        var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(towerSetting) as Action<int>;
                         setter?.Invoke(999999999);
                     }
                 }
@@ -641,7 +647,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                         {
                             if (setting is InstaMonkeyPlayerDataSetting instaSetting)
                             {
-                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(instaSetting) as TowerDetailsModel;
+                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(instaSetting) as TowerDetailsModel;
+                                if (tower == null) continue;
                                 
                                 var tierSet = new HashSet<int[]>(new TowerTiersEqualityComparer());
                                 for (var mainPath = 0; mainPath < 3; mainPath++)
@@ -668,7 +675,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             }
                         }
                         UpdateVisibleEntries();
-                    }), 1);
+                    }), 100);
             })).AddText(new Info("AddAllInstasText"), "Add All Instas", 50);
             
             _bulkActionsPanel.AddButton(new Info("FillCollections", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
@@ -680,7 +687,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                         {
                             if (setting is InstaMonkeyPlayerDataSetting instaSetting)
                             {
-                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(instaSetting) as TowerDetailsModel;
+                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(instaSetting) as TowerDetailsModel;
+                                if (tower == null) continue;
                                 
                                 var tierSet = new HashSet<int[]>(new TowerTiersEqualityComparer());
                                 for (var mainPath = 0; mainPath < 3; mainPath++)
@@ -727,13 +735,13 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             {
                                 if (setting is NumberPlayerDataSetting numSetting)
                                 {
-                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
                                     setter?.Invoke(value);
                                 }
                             }
                         }
                         UpdateVisibleEntries();
-                    }), 0);
+                    }), 15);
             })).AddText(new Info("SetAllBossesText"), "Set Boss Medals", 50);
             
             _bulkActionsPanel.AddButton(new Info("SetAllElites", 450, 150), VanillaSprites.BlueBtnLong, new Action(() =>
@@ -747,13 +755,13 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             {
                                 if (setting is NumberPlayerDataSetting numSetting)
                                 {
-                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
                                     setter?.Invoke(value);
                                 }
                             }
                         }
                         UpdateVisibleEntries();
-                    }), 0);
+                    }), 10);
             })).AddText(new Info("SetAllElitesText"), "Set Elite Medals", 50);
             
             _bulkActionsPanel.AddButton(new Info("SetAllRaces", 450, 150), VanillaSprites.YellowBtnLong, new Action(() =>
@@ -767,13 +775,13 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             {
                                 if (setting is NumberPlayerDataSetting numSetting)
                                 {
-                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(numSetting) as Action<int>;
+                                    var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
                                     setter?.Invoke(value);
                                 }
                             }
                         }
                         UpdateVisibleEntries();
-                    }), 0);
+                    }), 3);
             })).AddText(new Info("SetAllRacesText"), "Set Race Medals", 50);
         }
         else if (_category == "General")
@@ -799,7 +807,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 PopupScreen.instance.ShowOkPopup("Max Account", "This will max out your account progress. Continue?",
                     new Action(() =>
                     {
-                        GetPlayer().Data.monkeyMoney.Value = 999999999;
+                        GetPlayer().Data.monkeyMoney.Value = 550000;
                         GetPlayer().Data.knowledgePoints.Value = 999;
                         GetPlayer().Data.trophies.Value = 999999;
                         GetPlayer().Data.rank.Value = 155;
@@ -824,7 +832,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     new Action(() =>
                     {
                         // Max general stats
-                        GetPlayer().Data.monkeyMoney.Value = 999999999;
+                        GetPlayer().Data.monkeyMoney.Value = 550000;
                         GetPlayer().Data.knowledgePoints.Value = 999;
                         GetPlayer().Data.trophies.Value = 999999;
                         GetPlayer().Data.rank.Value = 155;
@@ -836,16 +844,17 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             if (setting is MapPlayerDataSetting mapSetting)
                             {
                                 mapSetting.Unlock();
-                                var map = Game.Player.Data.mapInfo.GetMap(mapSetting.GetType()
+                                var map = Game.Player.Data.mapInfo.GetMap((mapSetting.GetType()
                                     .GetField("_details", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                                    .GetValue(mapSetting).Cast<MapDetails>().id);
+                                    ?.GetValue(mapSetting) as MapDetails)?.id ?? "");
+                                if (map == null) continue;
                                 
                                 foreach (var difficulty in new[] { "Easy", "Medium", "Hard" })
                                 {
                                     foreach (var mode in MapPlayerDataSetting.Difficulties[difficulty])
                                     {
                                         var mapMode = map.GetOrCreateDifficulty(difficulty).GetOrCreateMode(mode, setting.Name.Contains("Coop"));
-                                        mapMode.timesCompleted = 1;
+                                        mapMode.timesCompleted = 79;
                                         mapMode.completedWithoutLoadingSave = true;
                                     }
                                 }
@@ -858,8 +867,61 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                             setting.Unlock();
                             if (setting is TowerPlayerDataSetting towerSetting)
                             {
-                                var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(towerSetting) as Action<int>;
+                                var setter = towerSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(towerSetting) as Action<int>;
                                 setter?.Invoke(999999999);
+                            }
+                        }
+                        
+                        // Add powers
+                        foreach (var setting in Settings["Powers"])
+                        {
+                            if (setting is NumberPlayerDataSetting numSetting)
+                            {
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
+                                setter?.Invoke(400);
+                            }
+                        }
+                        
+                        // Add instas
+                        foreach (var setting in Settings["Instas"])
+                        {
+                            if (setting is InstaMonkeyPlayerDataSetting instaSetting)
+                            {
+                                var tower = instaSetting.GetType().GetField("_tower", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(instaSetting) as TowerDetailsModel;
+                                if (tower == null) continue;
+                                
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {0, 0, 0}).Quantity = 100;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {2, 0, 0}).Quantity = 100;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {0, 2, 0}).Quantity = 100;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {0, 0, 2}).Quantity = 100;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {2, 2, 0}).Quantity = 50;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {2, 0, 2}).Quantity = 50;
+                                GetPlayer().GetInstaTower(tower.towerId, new[] {0, 2, 2}).Quantity = 50;
+                            }
+                        }
+                        
+                        // Add online medals
+                        foreach (var setting in Settings["Online Modes"])
+                        {
+                            if (setting is NumberPlayerDataSetting numSetting)
+                            {
+                                var setter = numSetting.GetType().GetField("Setter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(numSetting) as Action<int>;
+                                if (setting.Name.Contains("Boss") && !setting.Name.Contains("Elite") && !setting.Name.Contains("st"))
+                                {
+                                    setter?.Invoke(20);
+                                }
+                                else if (setting.Name.Contains("Elite") && setting.Name.Contains("Boss") && !setting.Name.Contains("st"))
+                                {
+                                    setter?.Invoke(10);
+                                }
+                                else if (setting.Name.Contains("Race"))
+                                {
+                                    setter?.Invoke(5);
+                                }
+                                else if (setting.Name.Contains("CT"))
+                                {
+                                    setter?.Invoke(3);
+                                }
                             }
                         }
                         
