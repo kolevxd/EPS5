@@ -390,8 +390,8 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private string _category = "General";
     private int _pageIdx;
 
-    private ModHelperPanel _topArea;
-    private ModHelperPanel _bulkActionsPanel;
+    private ModHelperPanel? _topArea;
+    private ModHelperPanel? _bulkActionsPanel;
 
     private static Btd6Player GetPlayer()
     {
@@ -507,7 +507,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     }
                 }
                 
-                PopupScreen.instance.ShowOkPopup("Powers Added", $"Successfully added {amount} of each power to your account!");
+                PopupScreen.instance.ShowOkPopup("Powers Added", $"Successfully added {amount} of each power to your account!", null);
             }
         })).AddText(new Info("ButtonText", 450, 80), "Add Powers", 45);
 
@@ -550,7 +550,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     }
                 }
                 
-                PopupScreen.instance.ShowOkPopup("Insta Monkeys Added", $"Successfully added {amount} of each tier of every tower as insta monkeys!");
+                PopupScreen.instance.ShowOkPopup("Insta Monkeys Added", $"Successfully added {amount} of each tier of every tower as insta monkeys!", null);
             }
         })).AddText(new Info("ButtonText", 450, 80), "Add Instas", 45);
 
@@ -577,7 +577,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                     }
                 }
                 
-                PopupScreen.instance.ShowOkPopup("XP Added", $"Successfully added {amount} XP to all towers!");
+                PopupScreen.instance.ShowOkPopup("XP Added", $"Successfully added {amount} XP to all towers!", null);
             }
         })).AddText(new Info("ButtonText", 450, 80), "Add Tower XP", 45);
 
@@ -605,7 +605,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
                 }
             }
             
-            PopupScreen.instance.ShowOkPopup("Paths Unlocked", "Successfully unlocked all upgrade paths for all towers!");
+            PopupScreen.instance.ShowOkPopup("Paths Unlocked", "Successfully unlocked all upgrade paths for all towers!", null);
         })).AddText(new Info("ButtonText", 450, 80), "Unlock All Paths", 45);
     }
 
@@ -632,8 +632,11 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
     private void UpdateVisibleEntries()
     {
         var anyUnlockable = Settings[_category].Any(s => !s.IsUnlocked());
-        _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
-        _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        if (_topArea != null)
+        {
+            _topArea.GetDescendent<ModHelperButton>("UnlockAll").SetActive(anyUnlockable);
+            _topArea.GetDescendent<ModHelperPanel>("UnlockAll Filler").SetActive(!anyUnlockable);
+        }
 
         var settings = Settings[_category].FindAll(s => s.Name.ContainsIgnoreCase(_searchValue));
         SetPage(_pageIdx, false);
@@ -689,7 +692,7 @@ public class EditPlayerDataMenu : ModGameMenu<ContentBrowser>
         [HarmonyPrefix]
         internal static void Prefix(TMP_InputField __instance, ref Event evt)
         {
-            if (_isOpen && __instance != _searchInput && (evt.character == '-' || !int.TryParse(__instance.text + evt.character, out _)))
+            if (_isOpen && __instance != _searchInput && (evt.character == '-' || !int.TryParse(__instance.text + evt.character, out var _)))
             {
                 evt.character = (char) 0;                
             }
